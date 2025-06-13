@@ -1,14 +1,25 @@
 import {
   isRouteErrorResponse,
+  Link,
   Links,
   Meta,
+  NavLink,
   Outlet,
   Scripts,
   ScrollRestoration,
 } from "react-router";
+import classNames from "classnames"
 
 import type { Route } from "./+types/root";
+import { HomeIcon, DiscoverIcon, RecipeBookIcon, SettingsIcon } from "./components/icons"
 import "./app.css";
+
+export function meta({}: Route.MetaArgs) {
+  return [
+    { title: "Recipes App" },
+    { name: "description", content: "Recipes app to add recipes and organize a grocery list" },
+  ];
+}
 
 export const links: Route.LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -32,7 +43,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <Meta />
         <Links />
       </head>
-      <body>
+      <body className="md:flex md:h-screen">
         {children}
         <ScrollRestoration />
         <Scripts />
@@ -44,8 +55,40 @@ export function Layout({ children }: { children: React.ReactNode }) {
 export default function App() {
   return (
     <>
-      <Outlet />
+      <nav className="bg-green-800 text-white">
+        <ul className="flex md:flex-col">
+          <AppNavLink to="/"><HomeIcon /></AppNavLink>
+          <AppNavLink to="discover"><DiscoverIcon /></AppNavLink>
+          <AppNavLink to="app"><RecipeBookIcon /></AppNavLink>
+          <AppNavLink to="settings"><SettingsIcon /></AppNavLink>
+        </ul>
+      </nav>
+      <div className="p-4">
+        <Outlet />
+      </div>
+      
     </>
+  )
+}
+
+type AppNavLinkProps = {
+  children: React.ReactNode
+  to: string
+}
+
+function AppNavLink({ children, to }: AppNavLinkProps) {
+  return (
+    <li className="w-16">
+      <NavLink to={to}>
+        { ({isActive} ) => (
+          <div className={classNames("py-4 flex justify-center hover:bg-green-300", 
+            { "bg-green-300": isActive }
+          )}>
+            {children}
+          </div>
+        ) }
+      </NavLink>
+    </li>
   )
 }
 
