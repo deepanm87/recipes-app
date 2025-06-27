@@ -2,6 +2,9 @@
   "name": "recipes-app",
   "private": true,
   "type": "module",
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
   "scripts": {
     "build": "react-router build",
     "dev": "react-router dev",
@@ -9,7 +12,7 @@
     "typecheck": "react-router typegen && tsc"
   },
   "dependencies": {
-    "@prisma/client": "^6.9.0",
+    "@prisma/client": "^6.10.1",
     "@react-router/node": "^7.5.3",
     "@react-router/serve": "^7.5.3",
     "classnames": "^2.5.1",
@@ -25,8 +28,9 @@
     "@types/node": "^20",
     "@types/react": "^19.1.2",
     "@types/react-dom": "^19.1.2",
-    "prisma": "^6.9.0",
+    "prisma": "^6.10.1",
     "tailwindcss": "^4.1.4",
+    "tsx": "^4.20.3",
     "typescript": "^5.8.3",
     "vite": "^6.3.3",
     "vite-tsconfig-paths": "^5.1.4"
