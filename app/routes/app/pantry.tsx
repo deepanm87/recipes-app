@@ -1,8 +1,10 @@
 import { PantryShelf } from "@prisma/client"
-import { useLoaderData, type LoaderArgs, Form } from "react-router"
-import { getAllShelves } from "~/models/pantry-shelf.server"
-import classNames from "classnames"
-import { SearchIcon } from "../../components/icons"
+import { useLoaderData, LoaderArgs, Form, type ActionFunction, type LoaderFunction } from "react-router"
+import { createShelf, getAllShelves } from "~/models/pantry-shelf.server"
+import { classNames } from "~/utils/misc"
+import { SearchIcon, PlusIcon } from "../../components/icons"
+import { PrimaryButton } from "../../components/form"
+import { useRef } from "react"
 
 export async function loader({ request }: LoaderArgs) {
     const url = new URL(request.url)
@@ -11,12 +13,25 @@ export async function loader({ request }: LoaderArgs) {
     return { shelves }
 }
 
+export const action: ActionFunction = async () => {
+    return createShelf()
+}
+
 export default function Pantry() {
     const data = useLoaderData() as LoaderData
     const [searchParams] = useSearchParams()
     const navigation = useNavigation()
+    const containerRef = useRef<HTMLUListElement>(null)
 
     const isSearching = navigation.formData?.has("q")
+    const isCreatingShelf = navigation.formData?.has("createShelf")
+
+    useEffect(() => {
+        if (!isCreatingShelf && containerRef.current) {
+            containerRef.current.scrollLeft = 0
+        }
+    }, [isCreatingShelf])
+
     return (
         <div>
             <Form className={classNames(
@@ -35,7 +50,22 @@ export default function Pantry() {
                 />
                 
             </Form>
-            <ul className={classNames("flex gap-8 overflow-x-auto mt-4", "snap-x snap-mandatory md:snap-none")}>
+
+            <Form method="post">
+                <PrimaryButton 
+                    name="createShelf" 
+                    className={classNames("mt-4 w-full md:w-fit", {"bg-primary-light": isCreatingShelf, })}
+                >
+                    <PlusIcon />
+                    <span className="pl-2">{isCreatingShelf ? "Creating Shelf" : "Create Shelf"}</span>
+                </PrimaryButton>
+            </Form>
+            <ul 
+                ref={containerRef} 
+                className={classNames(
+                    "flex gap-8 overflow-x-auto mt-4 pb-4", 
+                    "snap-x snap-mandatory md:snap-none"
+                    )}>
                 { data.shelves.map( shelf => 
                     <li 
                         key={shelf.id} 
