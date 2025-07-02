@@ -7,5 +7,8 @@ export default defineConfig({
   plugins: [tailwindcss(), reactRouter(), tsconfigPaths()],
   server: {
     port: 3000
+  },
+  ssr: {
+    noExternal: ["@prisma/client", "prisma"]
   }
 });
