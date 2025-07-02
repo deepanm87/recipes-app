@@ -28,3 +28,21 @@ export function createShelf() {
         }
     })
 }
+
+export async function deleteShelf(shelfId: string) {
+    try {
+        const deleted = await db.pantryShelf.delete({
+        where: {
+            id: shelfId
+        }
+    })
+    return deleted
+    } catch (error) {
+        if (error instanceof Prisma.PrismaClientKnownRequestError) {
+            if (error.code === "P2025") {
+                return error.message
+            }
+        }
+        throw error
+    }
+}
