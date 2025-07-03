@@ -1,10 +1,10 @@
 import { PantryShelf } from "@prisma/client"
 import { useLoaderData, Form, type ActionFunction, type LoaderFunction } from "react-router"
-import { createShelf, getAllShelves, deleteShelf } from "~/models/pantry-shelf.server"
+import { createShelf, getAllShelves, deleteShelf, saveShelfName } from "~/models/pantry-shelf.server"
 import { classNames } from "~/utils/misc"
-import { SearchIcon, PlusIcon } from "../../components/icons"
+import { SearchIcon, PlusIcon, SaveIcon } from "../../components/icons"
 import { PrimaryButton, DeleteButton } from "../../components/form"
-import { useRef } from "react"
+import { useEffect, useRef } from "react"
 
 export async function loader({ request }) {
     const url = new URL(request.url)
@@ -12,6 +12,8 @@ export async function loader({ request }) {
     const shelves = await getAllShelves(q)
     return { shelves }
 }
+
+type FieldErrors = { [ key: string]: string }
 
 export const action: ActionFunction = async ({ request }) => {
     const formData = await request.formData()
@@ -26,6 +28,25 @@ export const action: ActionFunction = async ({ request }) => {
             }
             return deleteShelf(shelfId)
         }
+        case "saveShelfName": {
+            const shelfId = formData.get("shelfId")
+            const shelfName = formData.get("shelfName")
+            const errors: FieldErrors = {}
+            if (typeof shelfId === "string" && typeof shelfName === "string" && shelfName !== "") {
+                return saveShelfName(shelfId, shelfName)
+            }
+            if (typeof shelfName !== "string") {
+                errors["shelfName"] = "Shelf name must be a string"
+            }
+            if (shelfName === "") {
+                errors["shelfName"] = "Shelf name cannot be blank"
+            }
+            if (typeof shelfId !== "string") {
+                errors["shelfId"] = "Shelf ID must be a string"
+            }
+
+            return { errors }
+        }
         default: {
             return null
         }
@@ -35,11 +56,12 @@ export const action: ActionFunction = async ({ request }) => {
 export default function Pantry() {
     const data = useLoaderData() as LoaderData
     const [searchParams] = useSearchParams()
+    const createShelfFetcher = useFetcher()
     const navigation = useNavigation()
     const containerRef = useRef<HTMLUListElement>(null)
 
     const isSearching = navigation.formData?.has("q")
-    const isCreatingShelf = navigation.formData?.get("_action") === "createShelf"
+    const isCreatingShelf = createShelfFetcher.formData?.get("_action") === "createShelf"
 
     useEffect(() => {
         if (!isCreatingShelf && containerRef.current) {
@@ -66,7 +88,7 @@ export default function Pantry() {
                 
             </Form>
 
-            <Form method="post">
+            <createShelfFetcher.Form method="post">
                 <PrimaryButton 
                     name="_action" 
                     value="createShelf"
@@ -76,7 +98,7 @@ export default function Pantry() {
                     <PlusIcon />
                     <span className="pl-2">{isCreatingShelf ? "Creating Shelf" : "Create Shelf"}</span>
                 </PrimaryButton>
-            </Form>
+            </createShelfFetcher.Form>
             <ul 
                 ref={containerRef} 
                 className={classNames(
@@ -84,28 +106,7 @@ export default function Pantry() {
                     "snap-x snap-mandatory md:snap-none"
                     )}>
                 { data.shelves.map( shelf => {
-                    const isDeletingShelf = 
-                        navigation.formData?.get("_action") === "deleteShelf" && 
-                        navigation.formData?.get("shelfId") === shelf.id
-                    return <li 
-                            key={shelf.id} 
-                            className={classNames(
-                                "border-2 border-primary rounded-md p-4 h-fit", 
-                                "w-[calc(100vw-2rem)] flex-none snap-center",
-                                "md:w-96"
-                            )}
-                            >
-                                <h1 className="text-2xl font-extrabold mb-2"> {shelf.name} </h1> 
-                                <ul>
-                                    { shelf.items.map( item => <li key={item.id} className="py-2">{item.name}</li> )}
-                                </ul>
-                                <Form method="post" className="pt-8">
-                                    <input type="hidden" name="shelfId" value={shelf.id} />
-                                    <DeleteButton className="w-full" name="_action" value="deleteShelf" isLoading={isDeletingShelf}>
-                                        {isDeletingShelf ? "Deleting Shelf": "Delete Shelf"}
-                                    </DeleteButton>
-                                </Form>
-                            </li> 
+                    <Shelf key={shelf.id} shelf={shelf} />
                         }
                     ) 
                 }
@@ -113,4 +114,62 @@ export default function Pantry() {
         </div>
     )
 }
+
+type ShelfProps = {
+    shelf: {
+        id: string
+        name: string
+        items: {
+            id: string
+            name: string
+        }
+    }
+}
+
+function Shelf({ shelf }: ShelfProps) {
+    const deleteShelfFetcher = useFetcher()
+    const saveShelfNameFetcher = useFetcher()
+
+    const isDeletingShelf = 
+                        deleteShelfFetcher.formData?.get("_action") === "deleteShelf" && 
+                        deleteShelfFetcher.formData?.get("shelfId") === shelf.id
+
+                    return (
+                        <li 
+                            key={shelf.id} 
+                            className={classNames(
+                                "border-2 border-primary rounded-md p-4 h-fit", 
+                                "w-[calc(100vw-2rem)] flex-none snap-center",
+                                "md:w-96"
+                            )}
+                            >
+                                <saveShelfNameFetcher.Form method="post" reloadDocument className="flex"> 
+                                    <input 
+                                        type="text" 
+                                        defaultValue={shelf.name} 
+                                        className={classNames(
+                                            "text-2xl font-extrabold mb-2 w-full",
+                                            "border-b-2 border-b-background focus:border-b-primary"
+                                        )}
+                                        name="shelfName"
+                                        placeholder="Shelf Name"
+                                        autoComplete="off"
+                                    />
+                                    <button name="_action" value="saveShelfName" className="ml-4"><SaveIcon /></button>
+                                    <input type="hidden" name="shelfId" value={shelf.id} />
+                                </saveShelfNameFetcher.Form>
+                                
+                                <ul>
+                                    { shelf.items.map( item => <li key={item.id} className="py-2">{item.name}</li> )}
+                                </ul>
+                                <deleteShelfFetcher.Form method="post" className="pt-8">
+                                    <input type="hidden" name="shelfId" value={shelf.id} />
+                                    <DeleteButton className="w-full" name="_action" value="deleteShelf" isLoading={isDeletingShelf}>
+                                        {isDeletingShelf ? "Deleting Shelf": "Delete Shelf"}
+                                    </DeleteButton>
+                                </deleteShelfFetcher.Form>
+                            </li> 
+                    )
+}
+
 

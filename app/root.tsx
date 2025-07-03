@@ -56,8 +56,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   return (
-    <>
-      <nav className="bg-green-800 text-white">
+    <html lang="en">
+      <head>
+
+      </head>
+      <body className="md:flex md:h-screen bg-background">
+        <nav className="bg-primary text-white md:w-16">
         <ul className="flex md:flex-col">
           <AppNavLink to="/"><HomeIcon /></AppNavLink>
           <AppNavLink to="discover"><DiscoverIcon /></AppNavLink>
@@ -70,7 +74,10 @@ export default function App() {
       </div>
       <ScrollRestoration />
       <Scripts />
-    </>
+      </body>
+    </html>
+      
+    
   )
 }
 
