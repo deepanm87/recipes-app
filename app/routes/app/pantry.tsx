@@ -1,5 +1,5 @@
 import { PantryShelf } from "@prisma/client"
-import { useLoaderData, Form, type ActionFunction, type LoaderFunction } from "react-router"
+import { useLoaderData, Form, type ActionFunction } from "react-router"
 import { createShelf, getAllShelves, deleteShelf, saveShelfName } from "~/models/pantry-shelf.server"
 import { deleteShelfItem } from "~/models/pantry-shelf.server"
 import { classNames, useServerLayoutEffect } from "~/utils/misc"
@@ -9,7 +9,7 @@ import { useEffect, useRef, useState } from "react"
 import { z } from "zod"
 import { validateForm } from "~/utils/validation"
 
-export async function loader: LoaderFunction = async ({ request }) => {
+export async function loader = async ({ request }: Route.LoaderArgs) => {
     const url = new URL(request.url)
     const q = url.searchParams.get("q")
     const shelves = await getAllShelves(q)

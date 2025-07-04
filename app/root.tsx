@@ -13,7 +13,7 @@ import {
 import classNames from "classnames"
 
 import type { Route } from "./+types/root";
-import { HomeIcon, DiscoverIcon, RecipeBookIcon, SettingsIcon } from "./components/icons"
+import { HomeIcon, DiscoverIcon, RecipeBookIcon, SettingsIcon, LoginIcon } from "./components/icons"
 import "./app.css";
 
 export function meta({}: Route.MetaArgs) {
@@ -61,12 +61,17 @@ export default function App() {
 
       </head>
       <body className="md:flex md:h-screen bg-background">
-        <nav className="bg-primary text-white md:w-16">
+        <nav className="bg-primary text-white md:w-16 flex md:flex-col justify-between">
         <ul className="flex md:flex-col">
           <AppNavLink to="/"><HomeIcon /></AppNavLink>
           <AppNavLink to="discover"><DiscoverIcon /></AppNavLink>
           <AppNavLink to="app"><RecipeBookIcon /></AppNavLink>
           <AppNavLink to="settings"><SettingsIcon /></AppNavLink>
+        </ul>
+        <ul>
+          <AppNavLink to="/login"> 
+            <LoginIcon /> 
+          </AppNavLink>
         </ul>
       </nav>
       <div className="p-4 w-full md:w-[calc(100%-4rem)]">
