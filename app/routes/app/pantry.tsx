@@ -1,19 +1,38 @@
 import { PantryShelf } from "@prisma/client"
 import { useLoaderData, Form, type ActionFunction, type LoaderFunction } from "react-router"
 import { createShelf, getAllShelves, deleteShelf, saveShelfName } from "~/models/pantry-shelf.server"
-import { classNames } from "~/utils/misc"
-import { SearchIcon, PlusIcon, SaveIcon } from "../../components/icons"
-import { PrimaryButton, DeleteButton } from "../../components/form"
-import { useEffect, useRef } from "react"
+import { deleteShelfItem } from "~/models/pantry-shelf.server"
+import { classNames, useServerLayoutEffect } from "~/utils/misc"
+import { SearchIcon, PlusIcon, SaveIcon, TrashIcon } from "../../components/icons"
+import { PrimaryButton, DeleteButton, ErrorMessage } from "../../components/forms"
+import { useEffect, useRef, useState } from "react"
+import { z } from "zod"
+import { validateForm } from "~/utils/validation"
 
-export async function loader({ request }) {
+export async function loader: LoaderFunction = async ({ request }) => {
     const url = new URL(request.url)
     const q = url.searchParams.get("q")
     const shelves = await getAllShelves(q)
     return { shelves }
 }
 
-type FieldErrors = { [ key: string]: string }
+const deleteShelfSchema = z.object({
+    shelfId: z.string()
+})
+
+const saveShelfNameSchema = z.object({
+    shelfId: z.string(),
+    shelfName: z.string().min(1, "Shelf name cannot be blank")
+})
+
+const createShelfItemSchema = z.object({
+    shelfId: z.string(),
+    itemName: z.string().min(1, 'Item name cannot be blank')
+})
+
+const deleteShelfItemSchema = z.object({
+    itemId: z.string()
+})
 
 export const action: ActionFunction = async ({ request }) => {
     const formData = await request.formData()
@@ -22,30 +41,36 @@ export const action: ActionFunction = async ({ request }) => {
             return createShelf()
         }
         case "deleteShelf": {
-            const shelfId = formData.get("shelfId")
-            if (typeof shelfId !== "string") {
-                return { errors: { shelfId: "Shelf ID must be a string" }}
-            }
-            return deleteShelf(shelfId)
+            return validateForm(
+                formData,
+                deleteShelfSchema,
+                data => deleteShelf(data.shelfId)
+                errors => { errors }
+            )
         }
         case "saveShelfName": {
-            const shelfId = formData.get("shelfId")
-            const shelfName = formData.get("shelfName")
-            const errors: FieldErrors = {}
-            if (typeof shelfId === "string" && typeof shelfName === "string" && shelfName !== "") {
-                return saveShelfName(shelfId, shelfName)
-            }
-            if (typeof shelfName !== "string") {
-                errors["shelfName"] = "Shelf name must be a string"
-            }
-            if (shelfName === "") {
-                errors["shelfName"] = "Shelf name cannot be blank"
-            }
-            if (typeof shelfId !== "string") {
-                errors["shelfId"] = "Shelf ID must be a string"
-            }
-
-            return { errors }
+            return validateForm(
+                formData, 
+                saveShelfNameSchema, 
+                data => saveShelfName(data.shelfId, data.shelfName),
+                errors => { errors }
+             )
+        }
+        case "createShelfItem": {
+            return validateForm(
+                formData,
+                createShelfItemSchema,
+                data => createShelfItem(data.shelfId, data.itemName),
+                errors => { errors }
+            )
+        }
+        case "deleteShelfItem": {
+            return validateForm(
+                formData,
+                deleteShelfItemSchema,
+                data => deleteShelfItem(data.itemId),
+                errors => { errors }
+            )
         }
         default: {
             return null
@@ -129,12 +154,15 @@ type ShelfProps = {
 function Shelf({ shelf }: ShelfProps) {
     const deleteShelfFetcher = useFetcher()
     const saveShelfNameFetcher = useFetcher()
-
+    const createShelfItemFetcher = useFetcher()
+    const createItemFormRef = useRef<HTMLFormElement>(null)
+    const { renderedItems, addItem } = useOptimisticItems(shelf.items, createShelfItemFetcher.state)
+    const isHydrated = useIsHydrated()
     const isDeletingShelf = 
                         deleteShelfFetcher.formData?.get("_action") === "deleteShelf" && 
                         deleteShelfFetcher.formData?.get("shelfId") === shelf.id
 
-                    return (
+                    return isDeletingShelf ? null : (
                         <li 
                             key={shelf.id} 
                             className={classNames(
@@ -143,33 +171,177 @@ function Shelf({ shelf }: ShelfProps) {
                                 "md:w-96"
                             )}
                             >
-                                <saveShelfNameFetcher.Form method="post" reloadDocument className="flex"> 
-                                    <input 
-                                        type="text" 
-                                        defaultValue={shelf.name} 
-                                        className={classNames(
-                                            "text-2xl font-extrabold mb-2 w-full",
-                                            "border-b-2 border-b-background focus:border-b-primary"
-                                        )}
-                                        name="shelfName"
-                                        placeholder="Shelf Name"
-                                        autoComplete="off"
-                                    />
-                                    <button name="_action" value="saveShelfName" className="ml-4"><SaveIcon /></button>
+                                <saveShelfNameFetcher.Form method="post" className="flex"> 
+                                    <div className="w-full mb-2 peer">
+                                        <input 
+                                            type="text" 
+                                            defaultValue={shelf.name} 
+                                            className={classNames(
+                                                "text-2xl font-extrabold w-full",
+                                                "border-b-2 border-b-background focus:border-b-primary",
+                                                saveShelfNameFetcher.data?.errors?.shelfName ? "border-b-red-600" : ""
+                                            )}
+                                            name="shelfName"
+                                            placeholder="Shelf Name"
+                                            autoComplete="off"
+                                            required
+                                        />
+                                        <ErrorMessage className="pl-2">
+                                            {saveShelfNameFetcher.data?.errors?.shelfId}
+                                        </ErrorMessage>
+                                    </div>
+                                    
+                                    { isHydrated ? null : (
+                                        <button 
+                                            name="_action" 
+                                            value="saveShelfName" 
+                                            className={classNames(
+                                                "ml-4 opacity-0 hover:opacity-100 focus:opacity-100",
+                                                "peer-focused-within:opacity-100"
+                                            )}
+                                        ><SaveIcon /></button>
+                                    ) }
                                     <input type="hidden" name="shelfId" value={shelf.id} />
+                                    <ErrorMessage className="pl-2">
+                                        {saveShelfNameFetcher.data?.errors?.shelfId}
+                                    </ErrorMessage>
                                 </saveShelfNameFetcher.Form>
+
+                                <createShelfItemFetcher.Form 
+                                    method="post" 
+                                    className="flex py-2" 
+                                    ref={createItemFormRef}
+                                    onSubmit={ event => {
+                                        const target = event.target as HTMLFormElement
+                                        const itemNameInput = target.elements.namedItem("itemName") as HTMLInputElement
+                                        addItem(itemNameInput.value)
+                                        event.preventDefault()
+                                        createShelfItemFetcher.submit({
+                                            itemName: itemNameInput.value,
+                                            shelfId: shelf.id,
+                                            _action: "createShelfItem"
+                                        },
+                                    {
+                                        method: "post"
+                                    })
+                                        createItemFormRef.current?.reset()
+                                    }}> 
+                                    <div className="w-full mb-2 peer">
+                                        <input 
+                                            type="text" 
+                                            className={classNames(
+                                                "w-full",
+                                                "border-b-2 border-b-background focus:border-b-primary",
+                                                createShelfItemFetcher.data?.errors?.shelfName ? "border-b-red-600" : ""
+                                            )}
+                                            onChange={ event => event.target.value !== "" && saveShelfNameFetcher.submit(
+                                                {
+                                                    _action: "saveShelfName",
+                                                    shelfName: event.target.value,
+                                                    shelfId: shelf.id
+                                                }, 
+                                                {
+                                                    method: "post"
+                                                }
+                                        )}
+                                            name="itemName"
+                                            placeholder="new item"
+                                            autoComplete="off"
+                                            required
+                                        />
+                                        <ErrorMessage className="pl-2">
+                                            {createShelfItemFetcher.data?.errors?.itemName}
+                                        </ErrorMessage>
+                                    </div>
+                                    
+                                    <button 
+                                        name="_action" 
+                                        value="createShelfItem" 
+                                        className={classNames(
+                                            "ml-4 opacity-0 hover:opacity-100 focus:opacity-100",
+                                            "peer-focus-within:opacity-100"
+                                         )}
+                                    ><SaveIcon /></button>
+                                    <input type="hidden" name="shelfId" value={shelf.id} />
+                                    <ErrorMessage className="pl-2">
+                                        {createShelfItemFetcher.data?.errors?.itemName}
+                                    </ErrorMessage>
+                                </createShelfItemFetcher.Form>
                                 
                                 <ul>
-                                    { shelf.items.map( item => <li key={item.id} className="py-2">{item.name}</li> )}
+                                    { renderedItems.map( item => <ShelfItem key={item.id} shelfItem={item} />)}
                                 </ul>
-                                <deleteShelfFetcher.Form method="post" className="pt-8">
+                                <deleteShelfFetcher.Form 
+                                    method="post" 
+                                    className="pt-8"
+                                    onSubmit={ event => {
+                                        if (!confirm("Are you sure you want to delete this shelf?")) {
+                                            event.preventDefault()
+                                        }
+                                    }}
+                                    >
                                     <input type="hidden" name="shelfId" value={shelf.id} />
-                                    <DeleteButton className="w-full" name="_action" value="deleteShelf" isLoading={isDeletingShelf}>
-                                        {isDeletingShelf ? "Deleting Shelf": "Delete Shelf"}
+                                    <ErrorMessage className="pb-2">{deleteShelfFetcher.data?.errors?.shelfId}</ErrorMessage>
+                                    <DeleteButton className="w-full" name="_action" value="deleteShelf">
+                                        Delete Shelf
                                     </DeleteButton>
                                 </deleteShelfFetcher.Form>
                             </li> 
                     )
+}
+
+type ShelfItemProps = {
+    shelfItem: RenderedItem
+}
+
+function ShelfItem({ shelfItem }: ShelfItemProps) {
+    const deleteShelfItemFetcher = useFetcher()
+    const isDeletingItem = !!deleteShelfItemFetcher.formData
+    return isDeletingItem ? null : (
+        <li className="py-2">
+            <deleteShelfItemFetcher.Form method="post" className="flex" >
+                <p className="w-full"> { shelfItem.name } </p>
+                { shelfItem.isOptimistic ? null : <button name="_action" value="deleteShelfItem"><TrashIcon /></button> }
+                <input type="hidden" name="itemId" value={shelfItem.id} />
+                <ErrorMessage className="pl-2">
+                    {deleteShelfItemFetcher.data?.errors?.itemId}
+                </ErrorMessage>
+            </deleteShelfItemFetcher.Form>
+        </li>
+    )
+}
+
+type RenderedItem = {
+    id: string
+    name: string
+    isOptimistic?: boolean
+}
+
+function useOptimisticItems(savedItems: Array<RenderedItem>, createShelfItemState: "idle" | "submitting" | "loading") {
+    const [optimisticItems, setOptimisticItems] = useState<Array<RenderedItem>>([])
+
+    const renderedItems = [...optimisticItems, ...savedItems]
+
+    renderedItems.sort( (a, b) => {
+        if (a.name === b.name) return 0
+        return a.name < b.name ? -1 : 1
+    })
+
+    useServerLayoutEffect( () => {
+        if (createShelfItemState === 'idle') {
+            setOptimisticItems([])
+        }
+    }, [createShelfItemState])
+
+    const addItem = (name: string) => {
+        setOptimisticItems( items => [...items, { id: createItemId(), name, isOptimistic: true }])
+    }
+
+    return { renderedItems, addItem }
+}
+
+function createItemId() {
+    return `${Math.round(Math.random() * 1_000_000)}`
 }
 
 

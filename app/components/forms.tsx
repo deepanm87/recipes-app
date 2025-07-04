@@ -37,3 +37,11 @@ export function DeleteButton({ className, isLoading, ...props}: ButtonProps) {
         )} />
     )
 }
+
+interface ErrorMessageProps extends HTMLAttributes<HTMLParagraphElement> {}
+
+export function ErrorMessage({ className, ...props }: ErrorMessageProps) {
+    return props.children ? (
+        <p {...props} className={className("text-red-600 text-xs", className)} />
+    ) : null
+}

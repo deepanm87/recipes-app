@@ -1,4 +1,5 @@
 import db from "~/db.server"
+import { handleDelete } from "./utils"
 
 export function getAllShelves(query: string | null) {
     return db.pantryShelf.findMany({
@@ -29,22 +30,12 @@ export function createShelf() {
     })
 }
 
-export async function deleteShelf(shelfId: string) {
-    try {
-        const deleted = await db.pantryShelf.delete({
+export function deleteShelf(id: string) {
+    return handleDelete(() => db.pantryShelf.delete({
         where: {
-            id: shelfId
+            id
         }
-    })
-    return deleted
-    } catch (error) {
-        if (error instanceof Prisma.PrismaClientKnownRequestError) {
-            if (error.code === "P2025") {
-                return error.message
-            }
-        }
-        throw error
-    }
+    }))
 }
 
 export function saveShelfName(shelfId: string, shelfName: string) {
