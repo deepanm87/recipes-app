@@ -4,9 +4,11 @@ import { classNames } from "~/utils/misc"
 import { validateForm } from "~/utils/validation"
 import { useActionData } from "react-router"
 import { getUser } from "~/models/user.server"
+import { generateMagicLink } from "~/magic-links.server"
 import { sessionCookie } from "~/cookies"
 import { getSession, commitSession } from "~/sessions"
 import type { ActionFunction, LoaderFunction } from "react-router"
+import { v4 as uuid } from "uuid"
 
 const loginSchema = z.object({
     email: z.string().email()
@@ -27,21 +29,16 @@ export async function action: ActionFunction = async ({ request }) => {
         formData,
         loginSchema,
         async ({ email }) => {
-            const user = await getUser(email)
-
-            if (user === null) {
-                return { errors: { email: "User with this email does not exist"} }
-            }
-
-            session.set("userId", user.id)
-
-            return ( { user }, {
+            const nonce = uuid()
+            session.flash("nonce", nonce)
+            const link = generateMagicLink(email, nonce)
+            return { 
                 headers: {
-                    "Set-Cookie": await commitSession(session)
+                    "Set-cookie": await commitSession(session)
                 }
-            })
+            }
         },
-        errors => data({ errors, email: formData.get("email")?.toString() })
+        errors => ({ errors, email: formData.get("email")?.toString() })
     )
 }
 
