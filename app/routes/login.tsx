@@ -1,18 +1,46 @@
 import { ErrorMessage, PrimaryButton } from "~/components/forms"
-import { Route } from "./+types/login"
 import { z } from "zod"
+import { classNames } from "~/utils/misc"
+import { validateForm } from "~/utils/validation"
+import { useActionData } from "react-router"
+import { getUser } from "~/models/user.server"
+import { sessionCookie } from "~/cookies"
+import { getSession, commitSession } from "~/sessions"
+import type { ActionFunction, LoaderFunction } from "react-router"
 
 const loginSchema = z.object({
     email: z.string().email()
 })
 
-export async function action({ request}: Route.ActionArgs) {
+export const loader: LoaderFunction = async ({ request }) => {
+    const cookieHeader = request.headers.get("cookie")
+    const session = await getSession(cookieHeader)
+    return null
+}
+
+export async function action: ActionFunction = async ({ request }) => {
+    const cookieHeader = request.headers.get("cookie")
+    const session = await getSession(cookieHeader)
     const formData = await request.formData()
 
     return validateForm(
         formData,
         loginSchema,
-        ({ email }) => {},
+        async ({ email }) => {
+            const user = await getUser(email)
+
+            if (user === null) {
+                return { errors: { email: "User with this email does not exist"} }
+            }
+
+            session.set("userId", user.id)
+
+            return ( { user }, {
+                headers: {
+                    "Set-Cookie": await commitSession(session)
+                }
+            })
+        },
         errors => data({ errors, email: formData.get("email")?.toString() })
     )
 }
