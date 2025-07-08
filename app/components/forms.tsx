@@ -45,3 +45,18 @@ export function ErrorMessage({ className, ...props }: ErrorMessageProps) {
         <p {...props} className={className("text-red-600 text-xs", className)} />
     ) : null
 }
+
+interface PrimaryInputProps extends InputHTMLAttributes<HTMLInputElement> {}
+
+export function PrimaryInput({ className, ...props}: PrimaryInputProps) {
+    return (
+        <input 
+            {...props} 
+            className={classNames(
+                "w-full outline-none border-2 border-gray-200",
+                "focus:border-primary rounded-md p-2",
+                className
+            )}
+        />
+    )
+}

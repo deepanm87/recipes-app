@@ -1,4 +1,6 @@
 import Cryptr from "cryptr"
+import { renderToStaticMarkup } from "react-dom/server"
+import { sendEmail } from "./utils/emails.server"
 
 if (typeof import.meta.env.MAGIC_LINK_SECRET !== "string") {
     throw new Error("Missing env: MAGIC_LINK_SECRET")
@@ -57,4 +59,25 @@ export function getMagicLinkPayload(request: Request) {
     }
 
     return magicLinkPayload
+}
+
+export function sendMagicLinkEmail(link: string, email: string) {
+    if (import.meta.env.NODE_ENV === "production") {
+        const html = renderToStaticMarkup(
+        <div>
+            <h1>Login to Recipes</h1>
+            <p>Hey, there! Click the link below to finish logging into the Recipes app.</p>
+            <a href={link}>Log In</a>
+        </div>
+    )
+    return sendEmail({
+        from: "Recipes <deep.mgn@gmail.com>",
+        to: email,
+        subject: "Log in to Recipes!",
+        html
+    })
+    } else {
+        console.log(link)
+    }
+    
 }
