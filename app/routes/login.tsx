@@ -10,18 +10,20 @@ import { getSession, commitSession } from "~/sessions"
 import { sendMagicLinkEmail } from "~/magic-links.server"
 import type { ActionFunction, LoaderFunction } from "react-router"
 import { v4 as uuid } from "uuid"
+import { requireLoggedOutUser } from "~/utils/auth.server"
 
 const loginSchema = z.object({
     email: z.string().email()
 })
 
 export const loader: LoaderFunction = async ({ request }) => {
-    const cookieHeader = request.headers.get("cookie")
-    const session = await getSession(cookieHeader)
+    await requireLoggedOutUser(request)
     return null
 }
 
 export async function action: ActionFunction = async ({ request }) => {
+    await requireLoggedOutUser(request)
+    
     const cookieHeader = request.headers.get("cookie")
     const session = await getSession(cookieHeader)
     const formData = await request.formData()

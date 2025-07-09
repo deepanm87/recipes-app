@@ -1,18 +1,24 @@
-import { PantryShelf } from "@prisma/client"
-import { useLoaderData, Form, type ActionFunction } from "react-router"
-import { createShelf, getAllShelves, deleteShelf, saveShelfName } from "~/models/pantry-shelf.server"
-import { deleteShelfItem } from "~/models/pantry-shelf.server"
-import { classNames, useServerLayoutEffect } from "~/utils/misc"
+import { data, isRouteErrorResponse, useFetcher, useLoaderData, useRouteError } from "react-router"
+import { z } from "zod"
+import { createShelf, getAllShelves, deleteShelf, saveShelfName, getShelf } from "~/models/pantry-shelf.server"
+import { createShelfItem, deleteShelfItem, getShelfItem } from "~/models/pantry-item.server"
+import { classNames, useServerLayoutEffect, useIsHydrated } from "~/utils/misc"
 import { SearchIcon, PlusIcon, SaveIcon, TrashIcon } from "../../components/icons"
 import { PrimaryButton, DeleteButton, ErrorMessage } from "../../components/forms"
 import { useEffect, useRef, useState } from "react"
-import { z } from "zod"
 import { validateForm } from "~/utils/validation"
+import { requireLoggedInUser } from "~/utils/auth.server"
 
-export async function loader = async ({ request }: Route.LoaderArgs) => {
+
+type LoaderData = {
+    shelves: Awaited<ReturnType<typeof getAllShelves>>
+}
+
+export const loader: LoaderFunction = async ({ request }) => {
+    const user = await requireLoggedInUser(request)
     const url = new URL(request.url)
     const q = url.searchParams.get("q")
-    const shelves = await getAllShelves(q)
+    const shelves = await getAllShelves(user.id, q)
     return { shelves }
 }
 
@@ -35,16 +41,24 @@ const deleteShelfItemSchema = z.object({
 })
 
 export const action: ActionFunction = async ({ request }) => {
+    const user = await requireLoggedInUser(request)
+    
     const formData = await request.formData()
     switch (formData.get("_action")) {
         case "createShelf": {
-            return createShelf()
+            return createShelf(user.id)
         }
         case "deleteShelf": {
             return validateForm(
                 formData,
                 deleteShelfSchema,
-                data => deleteShelf(data.shelfId)
+                async data => {
+                    const shelf = await getShelf(data.shelfId)
+                    if (shelf !== null && shelf.userId !== user.id) {
+                        throw ({ message: "This shelf is not yours, so you cannot delete it. "})
+                    }
+                    return deleteShelf(data.shelfId)
+                }
                 errors => { errors }
             )
         }
@@ -52,7 +66,13 @@ export const action: ActionFunction = async ({ request }) => {
             return validateForm(
                 formData, 
                 saveShelfNameSchema, 
-                data => saveShelfName(data.shelfId, data.shelfName),
+                async data => {
+                    const shelf = await getShelf(data.shelfId)
+                    if (shelf !== null && shelf.userId !== user.id) {
+                        throw ({ message: "This shelf is not yours, so you change it's name. "})
+                    }
+                    return saveShelfName(data.shelfId, data.shelfName)
+                },
                 errors => { errors }
              )
         }
@@ -60,7 +80,7 @@ export const action: ActionFunction = async ({ request }) => {
             return validateForm(
                 formData,
                 createShelfItemSchema,
-                data => createShelfItem(data.shelfId, data.itemName),
+                data => createShelfItem(user.id, data.shelfId, data.itemName),
                 errors => { errors }
             )
         }
@@ -68,7 +88,13 @@ export const action: ActionFunction = async ({ request }) => {
             return validateForm(
                 formData,
                 deleteShelfItemSchema,
-                data => deleteShelfItem(data.itemId),
+                async data => {
+                    const item = await getShelfItem(data.itemId)
+                    if (item !== null && item.userId !== user.id) {
+                        throw { message:"This item is not yours, so you cannot delete it!"}
+                    }
+                   return deleteShelfItem(data.itemId)
+                },
                 errors => { errors }
             )
         }
@@ -344,4 +370,26 @@ function createItemId() {
     return `${Math.round(Math.random() * 1_000_000)}`
 }
 
+export function ErrorBoundary() {
+    const error = useRouteError()
 
+    if (isRouteErrorResponse(error)) {
+        return (
+            <div className="bg-red-600 text-white rounded-md p-4">
+                <h1 className="mb-2">
+                    { error.status } - { error.statusText }
+                </h1>
+                <p> { error.data.message } </p>
+            </div>
+        )
+    }
+
+    return (
+        <div className="bg-red-600 text-white rounded-md p-4">
+        <h1 className="mb-2">
+            An unexpected error occurred
+        </h1>
+        <p> { error.data.message } </p>
+    </div>
+    )
+}

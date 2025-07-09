@@ -7,34 +7,38 @@ import {
   Outlet,
   Scripts,
   ScrollRestoration,
+  useLoaderData,
   useNavigation,
-  useResolvedPath
+  useResolvedPath,
+  useRouteError
 } from "react-router";
-import classNames from "classnames"
-
+import { classNames } from "./utils/misc"
 import type { Route } from "./+types/root";
-import { HomeIcon, DiscoverIcon, RecipeBookIcon, SettingsIcon, LoginIcon } from "./components/icons"
+import { HomeIcon, DiscoverIcon, RecipeBookIcon, SettingsIcon, LoginIcon, LogoutIcon } from "./components/icons"
 import "./app.css";
+import { getCurrentUser } from "./utils/auth.server"
+import styles from "./tailwind.css?url"
 
-export function meta({}: Route.MetaArgs) {
+
+export function meta() {
   return [
     { title: "Recipes App" },
     { name: "description", content: "Recipes app to add recipes and organize a grocery list" },
-  ];
+  ]
 }
 
-export const links: Route.LinksFunction = () => [
-  { rel: "preconnect", href: "https://fonts.googleapis.com" },
-  {
-    rel: "preconnect",
-    href: "https://fonts.gstatic.com",
-    crossOrigin: "anonymous",
-  },
-  {
-    rel: "stylesheet",
-    href: "https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap",
-  },
-];
+export const links: Route.LinksFunction = () => {
+  return [
+    { rel: "stylesheet", href: "/theme.css" },
+    { rel: "stylesheet", href: styles }
+  ]
+}
+
+export async function loader({ request }: Route.LoaderArgs) {
+  const user = await getCurrentUser(request)
+
+  return { isLoggedIn: user !== null }
+}
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
@@ -51,38 +55,36 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <Scripts />
       </body>
     </html>
-  );
+  )
 }
 
 export default function App() {
-  return (
-    <html lang="en">
-      <head>
+  const data = useLoaderData<typeof loader>()
 
-      </head>
-      <body className="md:flex md:h-screen bg-background">
-        <nav className="bg-primary text-white md:w-16 flex md:flex-col justify-between">
+  return (
+    <>
+      <nav className={classNames(
+        "bg-primary text-white md:w-16",
+        "flex justify-between md:flex-col"
+      )}>
         <ul className="flex md:flex-col">
-          <AppNavLink to="/"><HomeIcon /></AppNavLink>
           <AppNavLink to="discover"><DiscoverIcon /></AppNavLink>
-          <AppNavLink to="app"><RecipeBookIcon /></AppNavLink>
+          { data.isLoggedIn ? (
+            <AppNavLink to="app"><RecipeBookIcon /></AppNavLink>
+          ) : null }
           <AppNavLink to="settings"><SettingsIcon /></AppNavLink>
         </ul>
         <ul>
-          <AppNavLink to="/login"> 
-            <LoginIcon /> 
-          </AppNavLink>
+            { data.isLoggedIn ? (
+              <AppNavLink to="/logout"> <LogoutIcon /> </AppNavLink>) : 
+              ( <AppNavLink to="/login"> <LoginIcon /> </AppNavLink> ) 
+            }
         </ul>
       </nav>
       <div className="p-4 w-full md:w-[calc(100%-4rem)]">
         <Outlet />
       </div>
-      <ScrollRestoration />
-      <Scripts />
-      </body>
-    </html>
-      
-    
+    </>
   )
 }
 
@@ -94,51 +96,56 @@ type AppNavLinkProps = {
 function AppNavLink({ children, to }: AppNavLinkProps) {
   const path = useResolvedPath(to)
   const navigation = useNavigation()
-  const isLoading = navigation.state === "loading" && navigation.location.pathname === path.pathname
+  const isLoading = navigation.state === "loading" && navigation.location.pathname === path.pathname && !navigation.formData
 
   return (
     <li className="w-16">
       <NavLink to={to}>
-        { ({isActive} ) => (
-          <div className={classNames("py-4 flex justify-center hover:bg-green-300", 
-            { 
-              "bg-green-300": isActive || isLoading, 
-              "animate-pulse": isLoading
-            }
+        { ({isActive}) => (
+          <div 
+            className={classNames(
+              "py-4 text-center hover:bg-primary-light", 
+              isActive ? "bg-primary-light" : "",
+              isLoading ? "bg-primary-light animate-pulse" : ""
           )}>
             {children}
           </div>
-        ) }
+        )}
       </NavLink>
     </li>
   )
 }
 
-export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
-  let message = "Oops!";
-  let details = "An unexpected error occurred.";
-  let stack: string | undefined;
+export function ErrorBoundary() {
+  const error = useRouteError()
 
   if (isRouteErrorResponse(error)) {
-    message = error.status === 404 ? "404" : "Error";
-    details =
-      error.status === 404
-        ? "The requested page could not be found."
-        : error.statusText || details;
-  } else if (import.meta.env.DEV && error && error instanceof Error) {
-    details = error.message;
-    stack = error.stack;
+    return (
+      <div className="p-4">
+        <h1 className="text-2xl pb-3">
+          { error.status } - {error.statusText}
+        </h1>
+        <p>You're seeing this page because an error occurred.</p>
+        <p className="my-4 font-bold">{ error.data.message}</p>
+        <Link to="/" className="text-primary">
+        Take me home</Link>
+      </div>
+    )
+  }
+
+  let errorMessage = "Unknown error"
+  if (error instanceof Error) {
+    errorMessage = error.message
   }
 
   return (
-    <main className="pt-16 p-4 container mx-auto">
-      <h1>{message}</h1>
-      <p>{details}</p>
-      {stack && (
-        <pre className="w-full p-4 overflow-x-auto">
-          <code>{stack}</code>
-        </pre>
-      )}
-    </main>
+    <div className="p-4">
+      <h1 className="text-2xl pb-3">Whoops!</h1>
+      <p>You're seeing this page because an unexpected error occurred.</p>
+      <p className="my-4 font-bold">{errorMessage}</p>
+      <Link to="/" className="text-primary">
+        Take me home
+      </Link>
+    </div>
   );
 }
