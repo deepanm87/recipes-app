@@ -1,8 +1,8 @@
 import { Route } from "./+types/recipes"
 import { requireLoggedInUser } from "~/utils/auth.server"
 import db from "~/db.server"
-import { useLoaderData, Outlet, Form, redirect } from "react-router"
-import { RecipeDetailWrapper, RecipeListWrapper, RecipePageWrapper } from "~/components/recipes"
+import { useLoaderData, Outlet, Form, redirect, useLocation, NavLink, useNavigation } from "react-router"
+import { RecipeDetailWrapper, RecipeListWrapper, RecipePageWrapper, RecipeCard } from "~/components/recipes"
 import { SearchBar, PrimaryButton } from "~/components/forms"
 import { PlusIcon } from "~/components/icons"
 
@@ -24,6 +24,9 @@ export async function loader({ request }: Route.LoaderArgs) {
             totalTime: true,
             imageUrl: true,
             id: true
+        },
+        orderBy: {
+            createdAt: "desc"
         }
     })
 
@@ -43,12 +46,17 @@ export async function action({ request }: ActionArgs) {
         }
     })
 
-    return redirect('/app/recipes/${recipe.id}')
+    const url = new URL(request.url)
+    url.pathname = `app/recipes/${recipe.id}`
+
+    return redirect(url.toString())
 }
 
 
 export default function Recipes() {
     const data = useLoaderData<typeof loader>()
+    const location = useLocation()
+    const navigation = useNavigation()
 
     return (
         <RecipePageWrapper>
@@ -63,19 +71,25 @@ export default function Recipes() {
                     </PrimaryButton>
                 </Form>
                 <ul>
-                    { data?.recipes.map(recipe => (
+                    { data?.recipes.map( recipe => {
+                        const isLoading = navigation.location?.pathname.endsWith(recipe.id)
+                        return (
                         <li className="my-4" key={recipe.id}>
                             <NavLink 
-                                reloadDocument to={recipe.id}>
-                                    { ({isActive}) => 
+                                to={{ pathname: recipe.id, search: location.search }}
+                                prefetch="intent"
+                                >
+                                    { ({ isActive }) => 
                                     <RecipeCard 
                                         name={recipe.name} 
                                         totalTime={recipe.totalTime}
                                         imageUrl={recipe.imageUrl}
                                         isActive={isActive}
+                                        isLoading={isLoading}
                                         />}</NavLink>
                         </li>
-                    ))}
+                    )
+                    })}
                 </ul>
             </RecipeListWrapper>
             <RecipeDetailWrapper>
