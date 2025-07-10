@@ -1,18 +1,21 @@
 import { Route } from "./+types/$recipeId"
 import db from "~/db.server"
-import { data, useLoaderData, Form, useActionData } from "react-router"
+import { data, useLoaderData, Form, useActionData, redirect, useRouteError, isRouteErrorResponse } from "react-router"
 import { DeleteButton, ErrorMessage, Input, PrimaryButton } from "~/components/forms"
 import { SaveIcon, TimeIcon, TrashIcon } from "~/components/icons"
 import { Fragment } from "react"
 import classNames from "classnames"
 import { z } from "zod"
 import { validateForm } from "~/utils/validation"
+import { handleDelete } from "~/models/utils"
+import { requireLoggedInUser } from "~/utils/auth.server"
 
 export function headers({ loaderHeaders }: Route.HeadersArgs) {
     return loaderHeaders
 }
 
-export async function loader({params }: Route.LoaderArgs) {
+export async function loader({request, params }: Route.LoaderArgs) {
+    const user = await requireLoggedInUser(request)
     const recipe = await db.recipe.findUnique({
         where: {
             id: params.recipeId
@@ -30,6 +33,19 @@ export async function loader({params }: Route.LoaderArgs) {
             }
         }
     })
+
+    if (recipe === null) {
+        throw data( 
+            { message: "A recipe with that id does not exist"},
+            { status: 404 }
+        )
+    }
+
+    if (recipe.userId !== user.id) {
+        throw data( { message: "You are not authorized to view this recipe"},
+            { status: 401 }
+        )
+    }
 
     return data(
         { recipe }, 
@@ -58,10 +74,33 @@ const createIngredientSchema = z.object({
 })
 
 export async function action({ request, params }: ActionArgs) {
-    const formData = await request.formData()
+    const user = await requireLoggedInUser(request)
     const recipeId = String(params.recipeId)
+    const recipe = await db.recipe.findUnique({ where: { id: recipeId }})
 
-    switch(formData.get("_action")) {
+    if (recipe === null) {
+        throw data( 
+            { message: "A recipe with that id does not exist"},
+            { status: 404 }
+        )
+    }
+
+    if (recipe.userId !== user.id) {
+        throw data( { message: "You are not authorized to make changes to this recipe"},
+            { status: 401 }
+        )
+    }
+    const formData = await request.formData()
+    const _action = formData.get("_action")
+
+    if (typeof _action === "string" && _action.includes("deleteIngredient")) {
+        const ingredientId = _action.split(".")[1]
+        return handleDelete( () => 
+            db.ingredient.delete({ where: { id: ingredientId }})
+        )
+    }
+
+    switch(_action) {
         case "saveRecipe": {
             return validateForm(
                 formData, 
@@ -96,6 +135,10 @@ export async function action({ request, params }: ActionArgs) {
                     }),
                 errors => { errors }
             )
+        }
+        case "deleteRecipe": {
+            await handleDelete(() => db.recipe.delete({ where: { id: recipeId }}))
+            return redirect("/app/recipes")
         }
         default: {
             return null
@@ -168,7 +211,7 @@ export default function RecipeDetail() {
                             <ErrorMessage>{actionData?.errors?.[`ingredientNames.${index}`]}</ErrorMessage>
                         </div>
                         <button>
-                            <TrashIcon />
+                            <TrashIcon name="_action" value={`deleteIngredient.${ingredient.id}`}/>
                         </button>
                     </Fragment>
                 ))}
@@ -214,9 +257,30 @@ export default function RecipeDetail() {
             <ErrorMessage>{actionData?.errors?.instructions}</ErrorMessage>
             <hr className="my-4" />
             <div className="flex justify-between">
-                <DeleteButton>Delete this Recipe</DeleteButton>
+                <DeleteButton name="_action" value="deleteRecipe">Delete this Recipe</DeleteButton>
                 <PrimaryButton name="_action" value="saveRecipe"><div className="flex flex-col justify-center h-full">Save</div></PrimaryButton>
             </div>
         </Form>
+    )
+}
+
+export function ErrorBoundary() {
+    const error = useRouteError()
+
+    if (isRouteErrorResponse(error)) {
+        return (
+            <div className="bg-red-600 text-white rounded-md p-4">
+                <h1 className="mb-2">
+                    { error.status } { error.statusText ? `- ${error.statusText}` : "" }
+                </h1>
+                <p> { error.data.message } </p>
+            </div>
+        )
+    }
+
+    return (
+        <div className="bg-red-600 text-white rounded-md p-4">
+            An unexpected error occurred.
+        </div>
     )
 }
