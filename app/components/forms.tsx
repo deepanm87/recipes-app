@@ -1,5 +1,6 @@
 import { Form, useSearchParams, useNavigation } from "react-router"
 import type { ButtonHTMLAttributes, HTMLAttributes, InputHTMLAttributes } from "react"
+import { forwardRef } from "react"
 import { classNames } from "~/utils/misc"
 import { SearchIcon } from "./icons"
 
@@ -95,3 +96,24 @@ export function SearchBar({ placeholder, className }: SearchBarProps) {
         </Form>
     )
 }
+
+interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
+    error?: boolean
+}
+
+export const Input = forwardRef<HTMLInputElement, InputProps>(
+    function Input({ error, className, ...props }, ref) {
+        return (
+            <input 
+                ref={ref}
+                className={classNames(
+                    "w-full outline-none",
+                    "border-b-2 border-b-background focus:border-b-primary",
+                    error ? "border-b-red-600" : "",
+                    className
+                )} 
+                {...props}   
+            />
+        )
+    }
+)
