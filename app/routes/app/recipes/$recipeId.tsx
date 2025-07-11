@@ -1,17 +1,34 @@
-import { Route } from "./+types/$recipeId"
+import { type FileUpload, parseFormData } from "@mjackson/form-data-parser"
 import db from "~/db.server"
-import { data, useLoaderData, Form, useActionData, redirect, useRouteError, isRouteErrorResponse } from "react-router"
+import { 
+    data, 
+    useLoaderData, 
+    Form, 
+    useActionData, 
+    redirect, 
+    useRouteError, 
+    isRouteErrorResponse, 
+    useFetcher,
+    Link,
+    Outlet,
+    useOutletContext, 
+} from "react-router"
 import { DeleteButton, ErrorMessage, Input, PrimaryButton } from "~/components/forms"
-import { SaveIcon, TimeIcon, TrashIcon } from "~/components/icons"
-import { Fragment } from "react"
-import classNames from "classnames"
+import { CalendarIcon, SaveIcon, TimeIcon, TrashIcon } from "~/components/icons"
+import { Fragment, useRef, useState } from "react"
+import { classNames, useDebouncedFunction, useServerLayoutEffect } from "~/utils/misc"
 import { z } from "zod"
 import { validateForm } from "~/utils/validation"
 import { handleDelete } from "~/models/utils"
 import { requireLoggedInUser } from "~/utils/auth.server"
+import { Route } from "./+types/$recipeId"
+import { fileStorage, getStorageKey } from "~/recipe-image-storage.server"
+import { canChangeRecipe } from "~/utils/abilities.server"
 
-export function headers({ loaderHeaders }: Route.HeadersArgs) {
-    return loaderHeaders
+export function headers() {
+    return {
+        "Cache-Control": "max-age=10"
+    }
 }
 
 export async function loader({request, params }: Route.LoaderArgs) {
@@ -42,28 +59,50 @@ export async function loader({request, params }: Route.LoaderArgs) {
     }
 
     if (recipe.userId !== user.id) {
-        throw data( { message: "You are not authorized to view this recipe"},
+        throw data( 
+            { message: "You are not authorized to view this recipe"},
             { status: 401 }
         )
     }
+    return { recipe }
+}
 
-    return data(
-        { recipe }, 
-        { 
-            headers: {
-        "Cache-Control": "max-age=5"
-            }
-        }
-)}
+const saveNameSchema = z.object({
+    name: z.string().min(1, "Name cannot be blank")
+})
+
+const saveTotalTimeSchema = z.object({
+    totalTime: z.string().min(1, "Total time cannot be blank")
+})
+
+const saveInstructionsSchema = z.object({
+    instructions: z.string().min(1, "Instructions cannot be blank")
+})
+
+const ingredientId = z.string().min(1, "Ingredient ID is missing")
+const ingredientAmount = z.string().nullable()
+const ingredientName = z.string().min(1, "Name cannot be blank")
+
+const saveIngredientAmountSchema = z.object({
+    amount: ingredientAmount,
+    id: ingredientId
+})
+
+const saveIngredientNameSchema = z.object({
+    name: ingredientAmount,
+    id: ingredientId
+})
 
 const saveRecipeSchema = z.object({
-    name: z.string().min(1, "Name cannot be blank"),
-    totalTime: z.string().min(1, "Total time cannot be blank"),
-    instructions: z.string().min(1, "Instructions cannot be blank"),
-    ingredientIds: z.array(z.string().min(1, "Ingredient ID is missing")).optional(),
-    ingredientAmounts: z.array(z.string().nullable()).optional(),
-    ingredientNames: z.array(z.string().min(1, "Name cannot be blank")).optional()
-}).refine(data => 
+    imageUrl: z.string().optional(),
+    ingredientIds: z.array(ingredientId).optional(),
+    ingredientAmounts: z.array(ingredientAmount).optional(),
+    ingredientNames: z.array(ingredientName).optional()
+})
+.and(saveNameSchema)
+.and(saveTotalTimeSchema)
+.and(saveInstructionsSchema)
+.refine(data => 
     data.ingredientIds?.length === data.ingredientAmounts?.length && data.ingredientIds?.length === data.ingredientNames?.length,
     { message: "Ingredient arrays must all be the same length" }
 )
@@ -73,27 +112,33 @@ const createIngredientSchema = z.object({
     newIngredientName: z.string().min(1, "Name cannot be blank")
 })
 
-export async function action({ request, params }: ActionArgs) {
-    const user = await requireLoggedInUser(request)
+export async function action({ request, params }: Route.ActionArgs) {
     const recipeId = String(params.recipeId)
-    const recipe = await db.recipe.findUnique({ where: { id: recipeId }})
+    await canChangeRecipe(request, recipeId)
 
-    if (recipe === null) {
-        throw data( 
-            { message: "A recipe with that id does not exist"},
-            { status: 404 }
-        )
+    async function uploadHandler(fileUpload: FileUpload) {
+        if (
+            fileUpload.fieldName === "image" &&
+            fileUpload.type.startsWith("image/")
+        ) {
+            const storageKey = getStorageKey(recipeId)
+            await fileStorage.set(storageKey, fileUpload)
+            return fileStorage.get(storageKey)
+        }
     }
 
-    if (recipe.userId !== user.id) {
-        throw data( { message: "You are not authorized to make changes to this recipe"},
-            { status: 401 }
-        )
-    }
-    const formData = await request.formData()
-    const _action = formData.get("_action")
+    let formData
+    if (request.headers.get("Content-Type")?.includes("multipart/form-data")) {
+        formData = await parseFormData(request, uploadHandler)
+        const image = formData.get("image") as File
+        if (image.size !== 0) {
+            formData.set("imageUrl", `/recipe-image/${recipeId}`)
+        } else {
+            formData = await request.formData()
+        }
+        const _action = formData.get("_action")
 
-    if (typeof _action === "string" && _action.includes("deleteIngredient")) {
+        if (typeof _action === "string" && _action.includes("deleteIngredient")) {
         const ingredientId = _action.split(".")[1]
         return handleDelete( () => 
             db.ingredient.delete({ where: { id: ingredientId }})
@@ -118,7 +163,7 @@ export async function action({ request, params }: ActionArgs) {
                             }))
                         }
                     } }),
-                errors => { errors }
+                errors => data({ errors }, { status: 400 })
             )
         }
         case "createIngredient": {
@@ -133,22 +178,120 @@ export async function action({ request, params }: ActionArgs) {
                             name: newIngredientName
                         }
                     }),
-                errors => { errors }
+                errors => data( { errors }, { status: 400 })
             )
         }
         case "deleteRecipe": {
             await handleDelete(() => db.recipe.delete({ where: { id: recipeId }}))
             return redirect("/app/recipes")
         }
+        case "saveName": {
+            return validateForm(
+                formData,
+                saveNameSchema,
+                data => db.recipe.update({ where: { id: recipeId }, data }),
+                errors => data({errors}, {status: 400})
+            )
+        }
+        case "saveInstructions": {
+            return validateForm(
+                formData,
+                saveInstructionsSchema,
+                data => db.recipe.update({ where: { id: recipeId }, data }),
+                errors => data({errors}, {status: 400})
+            )
+        }
+        case "saveTotalTime": {
+            return validateForm(
+                formData,
+                saveTotalTimeSchema,
+                data => db.recipe.update({ where: { id: recipeId }, data }),
+                errors => data({errors}, {status: 400})
+            )
+        }
+        case "saveIngredientAmount": {
+            return validateForm(
+                formData,
+                saveIngredientAmountSchema,
+                ({ id, amount }) => db.ingredient.update({ where: { id }, data: { amount }}),
+                errors => data({ errors }, { status: 400 })
+            )
+        }
+        case "saveIngredientName": {
+            return validateForm(
+                formData,
+                saveIngredientNameSchema,
+                ({ id, name }) => db.ingredient.update({ where: { id }, data: { name }}),
+                errors => data({ errors }, { status: 400 })
+            )
+        }
+            
         default: {
             return null
         }
     }
 }
 
-export default function RecipeDetail() {
+export function useRecipeContext() {
+    return useOutletContext<{
+        recipeName?: string
+        mealPlanMultiplier?: number | null
+    }>()
+}
+
+export default function RecipeDetail({ params }: Route.ComponentProps) {
     const data = useLoaderData<typeof loader>()
-    const actionData = useActionData()
+    const actionData = useActionData<any>()
+    const saveNameFetcher = useFetcher<any>()
+    const saveTotalTimeFetcher = useFetcher<any>()
+    const saveInstructionsFetcher = useFetcher<any>()
+    const createIngredientFetcher = useFetcher<any>()
+    const newIngredientAmountRef = useRef<HTMLInputElement>(null)
+
+    const { renderedIngredients, addIngredient } = useOptimisticIngredients(
+        data.recipe.ingredients,
+        createIngredientFetcher.state
+    )
+
+    const [createIngredientForm, setCreateIngredientForm] = useState({
+        amount: "",
+        name: ""
+    })
+
+    const saveName = useDebouncedFunction(
+        (name: string) => saveNameFetcher.submit(
+            { _action: "saveName", name },
+            { method: "post", action: `/app/recipes/${data.recipe.id}` }
+        ),1000
+    )
+
+    const saveTotalTime = useDebouncedFunction((totalTime: string) => 
+        saveTotalTimeFetcher.submit(
+            { _action: "saveTotalTime", totalTime },
+            { method: "post", action: `/app/recipes/${data.recipe.id}` }
+        ), 1000
+    )
+
+    const saveInstructions = useDebouncedFunction((instructions: string) => 
+        saveInstructionsFetcher.submit(
+            { _action: "saveInstructions", instructions },
+            { method: "post", action: `/app/recipes/${data.recipe.id}` }
+        ), 1000
+    )
+
+    const createIngredient = () => {
+        addIngredient(createIngredientForm.amount, createIngredientForm.name)
+        createIngredientFetcher.submit(
+            {
+                _action: "createIngredient",
+                newIngredientAmount: createIngredientForm.amount,
+                newIngredientName: createIngredientForm.name
+            },
+            { method: "post"}
+        )
+        setCreateIngredientForm({ amount: "", name: "" })
+        newIngredientAmountRef.current?.focus()
+    }
 
     return (
         <Form
@@ -164,9 +307,10 @@ export default function RecipeDetail() {
                     className="text-2xl font-extrabold"
                     name="name"
                     defaultValue={data.recipe?.name}
-                    error={!!actionData?.errors?.name}
+                    error={!!(saveNameFetcher?.data?.errors?.name || actionData?.errors?.name)}
+                    onChange={event => saveName(event.target.value)}
                 />
-                <ErrorMessage>{actionData?.errors?.name}</ErrorMessage>
+                <ErrorMessage>{saveNameFetcher?.data?.errors?.name || actionData?.errors?.name}</ErrorMessage>
             </div>
             <div className="flex">
                 <TimeIcon />
@@ -178,42 +322,27 @@ export default function RecipeDetail() {
                         autoComplete="off"
                         name="TotalTime"
                         defaultValue={data.recipe?.totalTime}
-                        error={!!actionData?.errors?.name}
+                        error={!!(saveTotalTimeFetcher?.data?.errors.totalTime || actionData?.errors?.name)}
+                        onChange={e => saveTotalTime(e.target.value)}
                     />
-                    <ErrorMessage>{actionData?.errors?.totalTime}</ErrorMessage>
+                    <ErrorMessage>{saveTotalTimeFetcher?.data?.errors.totalTime || actionData?.errors?.totalTime}</ErrorMessage>
                 </div>
             </div>
             <div className="grid grid-cols-[30%_auto_min-content] my-4 gap-2">
                 <h2 className="font-bold text-sm pb-1">Amount</h2>
-                <h2 className="font-bold text-sm pb-1">Amount</h2>
+                <h2 className="font-bold text-sm pb-1">Name</h2>
                 <div></div>
                 { data.recipe?.ingredients.map( (ingredient, index) => (
-                    <Fragment key={ingredient.id}>
-                        <input type="hidden" name="ingredientIds[]" value={ingredient.id} />
-                        <div>
-                            <Input 
-                                type="text"
-                                autoComplete="off"
-                                name="ingredientAmounts[]"
-                                defaultValue={ingredient.amount ?? ""}
-                                error={!!actionData?.errors?.[`ingredientAmounts.${index}`]}
-                            />
-                            <ErrorMessage>{actionData?.errors?.[`ingredientAmounts.${index}`]}</ErrorMessage>
-                        </div>
-                        <div>
-                            <Input 
-                                type="text"
-                                autoComplete="off"
-                                name="ingredientNames[]"
-                                defaultValue={ingredient.name}
-                                error={!!actionData?.errors?.[`ingredientNames.${index}`]}
-                            />
-                            <ErrorMessage>{actionData?.errors?.[`ingredientNames.${index}`]}</ErrorMessage>
-                        </div>
-                        <button>
-                            <TrashIcon name="_action" value={`deleteIngredient.${ingredient.id}`}/>
-                        </button>
-                    </Fragment>
+                    <IngredientRow 
+                        key={ingredient.id}
+                        id={ingredient.id} 
+                        recipeId={data.recipe.id}
+                        amount={ingredient.amount}
+                        name={ingredient.name}
+                        amountError={actionData?.errors?.[`ingredientAmounts.${index}`]}
+                        nameError={actionData?.errors?.[`ingredientNames.${index}`]}
+                    />
+                    
                 ))}
                 <div>
                     <Input 
@@ -251,10 +380,12 @@ export default function RecipeDetail() {
                 className={classNames(
                     "w-full h-56 rounded-md outline-none",
                     "focus:border-2 focus:p-3 focus:border-primary duration-300",
-                    !!actionData?.errors?.instructions ? "border-2 border-red-500 p-3" : ""
+                    !!(saveInstructionsFetcher?.data?.errors?.instructions || actionData?.errors?.instructions) ? 
+                        "border-2 border-red-500 p-3" : ""
                 )}
+                onChange={e => saveInstructions(e.target.value)}
             />
-            <ErrorMessage>{actionData?.errors?.instructions}</ErrorMessage>
+            <ErrorMessage>{saveInstructionsFetcher?.data?.errors?.instructions || actionData?.errors?.instructions}</ErrorMessage>
             <hr className="my-4" />
             <div className="flex justify-between">
                 <DeleteButton name="_action" value="deleteRecipe">Delete this Recipe</DeleteButton>
@@ -264,23 +395,261 @@ export default function RecipeDetail() {
     )
 }
 
-export function ErrorBoundary() {
-    const error = useRouteError()
+type IngredientRowProps = {
+    id: string
+    recipeId: string
+    amount: string | null
+    amountError?: string
+    name: string
+    nameError?: string
+}
 
-    if (isRouteErrorResponse(error)) {
-        return (
-            <div className="bg-red-600 text-white rounded-md p-4">
-                <h1 className="mb-2">
-                    { error.status } { error.statusText ? `- ${error.statusText}` : "" }
-                </h1>
-                <p> { error.data.message } </p>
-            </div>
-        )
-    }
+function IngredientRow({id, recipeId, amount, amountError, name, nameError}: IngredientRowProps) {
+    const saveAmountFetcher = useFetcher()
+    const saveNameFetcher = useFetcher()
+
+    const saveAmount = useDebouncedFunction((amount: string) => 
+        saveAmountFetcher.submit(
+            { _action: "saveIngredientAmount", amount, id, }, 
+            { method: "post", action: `/app/recipes/${recipeId}` }
+        ), 1000
+    )
+
+    const saveName = useDebouncedFunction((amount: string) => 
+        saveNameFetcher.submit(
+            { _action: "saveIngredientAmount", name, id, }, 
+            { method: "post", action: `/app/recipes/${recipeId}` }
+        ), 1000
+    )
 
     return (
-        <div className="bg-red-600 text-white rounded-md p-4">
-            An unexpected error occurred.
-        </div>
+        <>
+            <Outlet 
+                context={{
+                    recipeName: data.recipe?.name,
+                    modelPlanMultiplier: data.recipe?.mealPlanMultiplier
+                }}
+            />
+            <Form method="post" encType="multipart/form-data" reloadDocument>
+                <button name="_action" value="saveRecipe" className="hidden" />
+                <div className="flex mb-2">
+                    <Link
+                        to="update-meal-plan"
+                        className={classNames(
+                            "flex flex-col justify-center",
+                            data.recipe?.mealPlanMultiplier !== null ? "text-primary" : ""
+                        )}
+                    >
+                        <CalendarIcon />
+                    </Link>
+                    <div className="ml-2 flex-grow">
+                        <Input 
+                            key={data.recipe?.id}
+                            type="text"
+                            placeholder="Recipe Name"
+                            autoComplete="off"
+                            className="text-2xl font-extrabold"
+                            name="name"
+                            defaultValue={data.recipe?.name}
+                            error={!!!(saveNameFetcher?.data?.errors?.name || actionData?.errors?.name)}
+                            onChange={ e => saveName(e.target.value)}
+                        />
+                        <ErrorMessage>
+                            { saveNameFetcher?.data?.errors?.name || actionData?.errors?.name}
+                        </ErrorMessage>
+                    </div>
+                </div>
+                <div className="flex">
+                    <TimeIcon />
+                    <div className="ml-2 flex-grow">
+                        <Input 
+                            key={data.recipe?.id}
+                            type="text"
+                            placeholder="Time"
+                            autoComplete="off"
+                            name="totalTime"
+                            defaultValue={data.recipe?.totalTime}
+                            error={!!(saveTotalTimeFetcher?.data?.errors?.totalTime || actionData?.errors?.totalTime)}
+                            onChange={ e => saveTotalTimeSchema(e.target.value)}
+                        />
+                        <ErrorMessage>
+                            { saveTotalTimeFetcher?.data?.errors?.totalTime || actionData?.errors?.totalTime}
+                        </ErrorMessage>
+                    </div>
+                </div>
+                <div className="grid grid-cols-[30%_auto_min-content] my-4 gap-2">
+                    <h2 className="font-bold text-sm pb-1">Amount</h2>
+                    <h2 className="font-bold text-sm pb-1">Name</h2>
+                    <div></div>
+                    { renderedIngredients.map( (ingredient, index) => (
+                        <IngredientRow 
+                            key={ingredient.id}
+                            id={ingredient.id}
+                            amount={ingredient.amount}
+                            name={ingredient.name}
+                            amountError={actionData?.errors?.[`ingredientAmounts.${index}`]}
+                            nameError={actionData?.errors?.[`ingredientNames.${index}`]}
+                            isOptimistic={ingredient.isOptimistic}
+                        />
+                    ))}
+                    <div>
+                        <Input 
+                            ref={newIngredientAmountRef}
+                            type="text"
+                            autoComplete="off"
+                            name="newIngredientAmount"
+                            className="border-b-gray-200"
+                            error={!!(createIngredientFetcher.data?.errors?.newIngredientAmount ?? actionData?.errors?.newIngredientAmount)}
+                            value={createIngredientForm.amount}
+                            onChange={e => setCreateIngredientForm( values => ({
+                                ...values,
+                                amount: e.target.value
+                            }))}
+                            onKeyDown={e => {
+                                if (e.key === "Enter") {
+                                    e.preventDefault()
+                                    createIngredient()
+                                }
+                            }}
+                        />
+                        <ErrorMessage>
+                            { createIngredientFetcher.data?.errors?.newIngredientAmount ?? actionData?.errors?.newIngredientAmount }
+                        </ErrorMessage>
+                    </div>
+                    <div>
+                        <Input 
+                            type="text"
+                            autoComplete="off"
+                            name="newIngredientName"
+                            className="border-b-gray-200"
+                            error={!!(createIngredientFetcher.data?.errors?.newIngredientName ??
+                                    actionData?.errors?.newIngredientName
+                            )}
+                            value={createIngredientForm.name}
+                            onChange={ e => 
+                                setCreateIngredientForm(values => ({
+                                    ...values,
+                                    name: e.target.value
+                                }))
+                            }
+                            onKeyDown={e => {
+                                if (e.key === "Enter") {
+                                    e.preventDefault()
+                                    createIngredient()
+                                }
+                            }}
+                        />
+                        <ErrorMessage>
+                            { createIngredientFetcher.data?.errors?.newIngredientName ??
+                                actionData?.errors?.newIngredientName
+                            }
+                        </ErrorMessage>
+                    </div>
+                    <button
+                        name="_action"
+                        value="createIngredient"
+                        onClick={ e => {
+                            e.preventDefault()
+                            createIngredient()
+                        }}
+                    >
+                        <SaveIcon />
+                    </button>
+                </div>
+                <label
+                    htmlFor="instructions"
+                    className="block font-bold text-sm pb-2 w-fit"
+                >
+                    Instructions
+                </label>
+                <textarea 
+                    key={data.recipe?.id}
+                    id="instructions"
+                    name="instructions"
+                    placeholder="Instructions go here"
+                    defaultValue={data.recipe?.instructions}
+                    className={classNames(
+                        "w-full h-56 rounded-md outline-none",
+                        "focus:border-2 focus:p-3 focus:border-primary duration-300",
+                        saveInstructionsFetcher?.data?.errors?.instructions ||
+                            actionData?.errors?.instructions
+                            ? "border-2 border-red-500 p-3" : ""
+                    )}
+                    onChange={e => saveInstructions(e.target.value)}
+                />
+                <ErrorMessage>
+                    { saveInstructionsFetcher?.data?.errors?.instructions ||
+                        actionData?.errors?.instructions
+                    }
+                </ErrorMessage>
+                <label
+                    htmlFor="image"
+                    className="block font-bold text-sm pb-2 w-fit mt-4"
+                >
+                    Image
+                </label>
+                <input 
+                    id="image"
+                    type="file"
+                    name="image"
+                    key={`${data.recipe?.id}.image`}
+                />
+                <hr className="my-4" />
+                <div className="flex justify-between">
+                    <DeleteButton name="_action" value="deleteRecipe">
+                        Delete this recipe
+                    </DeleteButton>
+                    <PrimaryButton name="_action" value="saveRecipe">
+                        <div className="flex flex-col justify-center h-full">Save</div>
+                    </PrimaryButton>
+                </div>
+            </Form>
+        </>
+                          
     )
 }
+
+type IngredientRowProps = {
+    id: string
+    amount: string | null
+    amountError?: string
+    name: string
+    nameError?: string
+    isOptimistic?: boolean
+}
+
+function IngredientRow({ id, amount, amountError, name, nameError, isOptimistic}: IngredientRowProps) {
+    const saveAmountFetcher = useFetcher<any>()
+    const saveNameFetcher = useFetcher<any>()
+    const deleteIngredientFetcher = useFetcher()
+
+    const saveAmount = useDebouncedFunction(
+        (amount: string) => saveAmountFetcher.submit(
+            {
+                _action: "saveIngredientAmount",
+                amount,
+                id
+            },
+            { method: "post" }
+        ), 1000
+    )
+
+    const saveName = useDebouncedFunction(
+        (name: string) => 
+            saveNameFetcher.submit(
+                {
+                    _action: "saveIngredientName",
+                    name,
+                    id
+                },
+                {
+                    method: "post"
+                }
+            ), 1000
+    )
+
+    
+}
+
+
+               

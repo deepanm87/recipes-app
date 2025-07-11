@@ -1,7 +1,7 @@
 import { Route } from "./+types/recipes"
 import { requireLoggedInUser } from "~/utils/auth.server"
 import db from "~/db.server"
-import { useLoaderData, Outlet, Form, redirect, useLocation, NavLink, useNavigation } from "react-router"
+import { useLoaderData, Outlet, Form, redirect, useLocation, NavLink, useNavigation, useFetcher } from "react-router"
 import { RecipeDetailWrapper, RecipeListWrapper, RecipePageWrapper, RecipeCard } from "~/components/recipes"
 import { SearchBar, PrimaryButton } from "~/components/forms"
 import { PlusIcon } from "~/components/icons"
@@ -72,23 +72,7 @@ export default function Recipes() {
                 </Form>
                 <ul>
                     { data?.recipes.map( recipe => {
-                        const isLoading = navigation.location?.pathname.endsWith(recipe.id)
-                        return (
-                        <li className="my-4" key={recipe.id}>
-                            <NavLink 
-                                to={{ pathname: recipe.id, search: location.search }}
-                                prefetch="intent"
-                                >
-                                    { ({ isActive }) => 
-                                    <RecipeCard 
-                                        name={recipe.name} 
-                                        totalTime={recipe.totalTime}
-                                        imageUrl={recipe.imageUrl}
-                                        isActive={isActive}
-                                        isLoading={isLoading}
-                                        />}</NavLink>
-                        </li>
-                    )
+                        <RecipeListItem key={recipe.id} recipe={recipe} />
                     })}
                 </ul>
             </RecipeListWrapper>
@@ -96,5 +80,45 @@ export default function Recipes() {
                 <Outlet />
             </RecipeDetailWrapper>
         </RecipePageWrapper>
+    )
+}
+
+type RecipeListItemProps = {
+    recipe: {
+        id: string
+        name: string
+        totalTime: string
+        imageUrl: string
+    }
+}
+function RecipeListItem({ recipe }: RecipeListItemProps) {
+    const navigation = useNavigation()
+    const location = useLocation()
+    const isLoading = navigation.location?.pathname.endsWith(recipe.id)
+    const saveNameFetcher = useFetcher({
+        key: `save-recipe-name-${recipe.id}`
+    })
+
+    const optimisticData = {
+        name: saveNameFetcher.formData?.get("name")?.toString()
+    }
+
+    return (
+        <li className="my-4" key={recipe.id}>
+            <NavLink 
+                to={{ pathname: recipe.id, search: location.search }}
+                prefetch="intent"
+            >
+                { ({ isActive }) => 
+                    <RecipeCard 
+                        name={optimisticData.name ?? recipe.name} 
+                        totalTime={recipe.totalTime}
+                        imageUrl={recipe.imageUrl}
+                        isActive={isActive}
+                        isLoading={isLoading}
+                    />
+                }
+            </NavLink>
+        </li>
     )
 }
