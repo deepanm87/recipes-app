@@ -648,7 +648,110 @@ function IngredientRow({ id, amount, amountError, name, nameError, isOptimistic}
             ), 1000
     )
 
-    
+    return deleteIngredientFetcher.state !== "idle" ? null : (
+        <Fragment>
+            <input type="hidden" name="ingredientIds[]" value={id} />
+            <div>
+                <Input 
+                    type="text"
+                    autoComplete="off"
+                    name="ingredientAmounts[]"
+                    defaultValue={amount ?? ""}
+                    error={!!(saveAmountFetcher.data?.errors?.amount ?? amountError)}
+                    onChange={e => saveAmount(e.target.value)}
+                    disabled={isOptimistic}
+                />
+                <ErrorMessage>
+                    { saveAmountFetcher.data?.errors?.amount ?? amountError}
+                </ErrorMessage>
+            </div>
+            <div>
+                <Input 
+                    type="text"
+                    autoComplete="off"
+                    name="ingredientNames[]"
+                    defaultValue={name}
+                    error={!!(saveNameFetcher.data?.errors?.name ?? nameError)}
+                    onChange={e => saveName(e.target.value)}
+                    disabled={isOptimistic}
+                />
+                <ErrorMessage>
+                    { saveNameFetcher.data?.errors?.name ?? nameError }
+                </ErrorMessage>
+            </div>
+            <button
+                name="_action"
+                value={`deleteIngredient.${id}`}
+                onClick={e => {
+                    e.preventDefault()
+                    deleteIngredientFetcher.submit(
+                        {
+                            _action: `deleteIngredient.${id}`
+                        },
+                        { method: "post" }
+                    )
+                }}
+            >
+                <TrashIcon />
+            </button>
+        </Fragment>
+    )
+}
+
+type RenderedIngredient = {
+    id: string
+    name: string
+    amount: string | null
+    isOptimistic?: boolean
+}
+
+function useOptimisticIngredients(
+    savedIngredients: Array<RenderedIngredient>,
+    createIngredientState: "idle" | "submitting" | loading
+) {
+    const [optimisticIngredients, setOptimisticIngredients] = useState<Array<RenderedIngredient>>([])
+
+    const renderedIngredients = [...saveIngredientNameSchema, ...optimisticIngredients]
+
+    useServerLayoutEffect( () => {
+        if (createIngredientState === "idle") {
+            setOptimisticIngredients([])
+        }
+    }, [createIngredientState])
+
+    const addIngredient = (amount: string | null, name: string) => {
+        setOptimisticIngredients( ingredients => [
+            ...ingredients,
+            { id: createItemId(), name, amount, isOptimistic: true }
+        ])
+    }
+
+    return { renderedIngredients, addIngredient}
+}
+
+function createItemId() {
+    return `${Math.round(Math.random() * 1_000_000)}`
+}
+
+export function ErrorBoundary() {
+    const error = useRouteError()
+
+    if (isRouteErrorResponse(error)) {
+        return (
+            <div className="bg-red-600 text-white rounded-md p-4">
+                <h1 className="mb-2">
+                    { error.status } { error.statusText ? `- ${error.statusText}` : ""}
+                </h1>
+                <p>{error.data.message}</p>
+            </div>
+        )
+    }
+
+    return (
+        <div className="bg-red-600 text-white rounded-md p-4">
+            An unknown error occurred.
+        </div>
+    )
 }
 
 
