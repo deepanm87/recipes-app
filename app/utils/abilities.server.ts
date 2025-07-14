@@ -16,4 +16,11 @@ export async function canChangeRecipe(request: Request, recipeId: string) {
             { status: 401 }
         )
     }
+
+    if (recipe.userId !== user.id) {
+        throw data(
+            { message: "You are not authorized to make changes to this recipe"},
+            { status: 401 }
+        )
+    }
 }

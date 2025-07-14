@@ -21,11 +21,11 @@ function objectify(formData: FormData) {
     return formFields
 }
 
-export function validateForm<T>(
+export function validateForm<Input, Output, R, E>(
     formData: FormData, 
-    zodSchema: z.Schema<T>, 
-    successFn: (data: T) => unknown, 
-    errorFn: (errors: FieldErrors) => unknown
+    zodSchema: z.Schema<Output, ZodTypeDef, Input>, 
+    successFn: (data: Output) => R, 
+    errorFn: (errors: FieldErrors) => E
     ) {
         const fields = objectify(formData)
         const result = zodSchema.safeParse(fields)
