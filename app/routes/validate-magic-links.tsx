@@ -1,11 +1,16 @@
-import type { LoaderFunction } from "react-router"
+import { data, redirect, useActionData } from "react-router"
+import { z } from "zod"
+import { ErrorMessage, PrimaryButton, PrimaryInput } from "~/components/forms"
 import { getMagicLinkPayload, invalidMagicLink } from "~/magic-links.server"
-import { getSession, commitSession } from "~/sessions"
-import { classNames } from "classnames"
+import { createUser, getUser } from "~/models/user.server"
+import { commitSession, getSession } from "~/sessions"
+import { classNames } from "~/utils/misc"
+import { validateForm } from "~/utils/validation"
+import { Route } from "./+types/validate-magic-link"
 
 const magicLinkMaxAge = 1000 * 60 * 10
 
-export const loader: LoaderFunction = async ({ request }) => {
+export async function loder({ request }: Route.LoaderArgs) {
     const magicLinkPayload = getMagicLinkPayload(request)
 
     const createdAt = new Date(magicLinkPayload.createdAt)
@@ -27,18 +32,18 @@ export const loader: LoaderFunction = async ({ request }) => {
     if (user) {
         session.set("userId", user.id)
         session.unset("nonce")
-        reutrn redirect("/app", {
+        return redirect("/app", {
             headers: {
                 "Set-Cookie": await commitSession(session)
             }
         })
     }
     
-    return {
+    return data("ok", {
         headers: {
             "Set-Cookie": await commitSession(session)
         }
-    }
+    })
 }
 
 const signUpSchema = z.object({
@@ -46,7 +51,7 @@ const signUpSchema = z.object({
     lastName: z.string().min(1, "Last name cannot be blank")
 })
 
-export const action: ActionFunction = async({ request }) => {
+export async function action({ request }: Route.ActionArgs) {
     const formData = await request.formData()
     return validateForm(
         formData,
@@ -54,7 +59,11 @@ export const action: ActionFunction = async({ request }) => {
         async ({ firstName, lastName }) => {
             const magicLinkPayload = getMagicLinkPayload(request)
 
-            const user = await createUser(magicLinkPayload.email, firstName, lastName)
+            const user = await createUser(
+                magicLinkPayload.email, 
+                firstName, 
+                lastName
+            )
 
             const cookie = request.headers.get("cookie")
             const session = await getSession(cookie)
@@ -67,11 +76,17 @@ export const action: ActionFunction = async({ request }) => {
                 }
             })
         },
-        errors => { 
-            errors, 
-            firstName: formData.get("firstName"),
-            lastName: formData.get("lastName")
-        }
+        errors => 
+            data(
+                {
+                    errors, 
+                    firstName: formData.get("firstName"),
+                    lastName: formData.get("lastName")
+                },
+                {
+                    status: 400
+                }
+            )
     )
 }
 
@@ -93,7 +108,7 @@ export default function ValidateMagicLink() {
                                     <label htmlFor="firstName">First Name</label>
                                     <PrimaryInput 
                                         id="firstName" 
-                                        autocomplete="off" 
+                                        autoComplete="off" 
                                         name="firstName" 
                                         defaultValue={actionData?.firstName}
                                         />
@@ -103,7 +118,7 @@ export default function ValidateMagicLink() {
                                     <label htmlFor="lastName">Last Name</label>
                                     <PrimaryInput 
                                         id="lastName" 
-                                        autocomplete="off" 
+                                        autoComplete="off" 
                                         name="lastName" 
                                         defaultValue={actionData?.lastName}
                                         />
@@ -111,7 +126,6 @@ export default function ValidateMagicLink() {
                                 </div>
                             </fieldset>
                             <PrimaryButton className="w-36 mx-auto">Sign Up</PrimaryButton>
-
                 </form>
             </div>
         </div>

@@ -8,3 +8,5 @@ export const sessionCookie = createCookie("recipes__session", {
     httpOnly: true,
     secure: true
 })
+
+export const themeCookie = createCookie("recipes__theme")
