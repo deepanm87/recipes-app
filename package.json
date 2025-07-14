@@ -30,6 +30,7 @@
     "zod": "^3.25.71"
   },
   "devDependencies": {
+    "@playwright/test": "^1.54.1",
     "@react-router/dev": "^7.5.3",
     "@tailwindcss/vite": "^4.1.4",
     "@types/cryptr": "^4.0.3",
