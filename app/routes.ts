@@ -1,8 +1,8 @@
 import { index, route, type RouteConfig } from "@react-router/dev/routes";
 
 const testRoutes = () => {
-  if (process.env.INCLUDE_TEST_ROUTES) {
-    if (process.env.NODE_ENV === "production") {
+  if (import.meta.env.INCLUDE_TEST_ROUTES) {
+    if (import.meta.env.NODE_ENV === "production") {
       console.warn(
         "WARNING: NODE_ENV is set to 'production', so we are going to skip creating test routes"
       );

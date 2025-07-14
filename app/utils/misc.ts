@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useState, useRef } from "react"
+import { useEffect, useLayoutEffect, useState, useRef, useMemo } from "react"
 import { useLocation, useMatches } from "react-router"
 
 export function classNames(...names: Array<string | undefined>) {
@@ -12,7 +12,7 @@ export function classNames(...names: Array<string | undefined>) {
 
 export function useMatchesData(id: string) {
     const matches = useMatches()
-    const route = React.useMemo(
+    const route = useMemo(
         () => matches.find(route => route.id === id),
         [matches, id]
     )

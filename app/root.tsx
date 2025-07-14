@@ -14,7 +14,7 @@ import {
 } from "react-router";
 import { classNames } from "./utils/misc"
 import type { Route } from "./+types/root";
-import { HomeIcon, DiscoverIcon, RecipeBookIcon, SettingsIcon, LoginIcon, LogoutIcon } from "./components/icons"
+import { DiscoverIcon, RecipeBookIcon, SettingsIcon, LoginIcon, LogoutIcon } from "./components/icons"
 import "./app.css";
 import { getCurrentUser } from "./utils/auth.server"
 import styles from "./tailwind.css?url"

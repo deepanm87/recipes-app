@@ -34,7 +34,7 @@ export async function loader({ request }: Route.LoaderArgs) {
                     not: null,
                 }
             }
-        }
+        },
         include: {
             recipe: {
                 select: {
