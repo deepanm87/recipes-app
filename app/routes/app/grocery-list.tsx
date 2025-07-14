@@ -4,7 +4,7 @@ import { CheckCircleIcon } from "~/components/icons"
 import db from "~/db.server"
 import { requireLoggedInUser } from "~/utils/auth.server"
 import { validateForm } from "~/utils/validation"
-import { Route } from "./+types/grocery-list"
+import type { Route } from "./+types/grocery-list"
 
 type GroceryListItem = {
     id: string

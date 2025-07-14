@@ -8,7 +8,7 @@ import { PrimaryButton, DeleteButton, ErrorMessage, SearchBar } from "../../comp
 import { useEffect, useRef, useState } from "react"
 import { validateForm } from "~/utils/validation"
 import { requireLoggedInUser } from "~/utils/auth.server"
-import { Route } from "./+types/pantry"
+import type { Route } from "./+types/pantry"
 
 export const loader = async ({ request }: Route.LoaderArgs) => {
     const user = await requireLoggedInUser(request)

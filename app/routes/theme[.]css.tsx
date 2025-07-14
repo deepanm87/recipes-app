@@ -1,5 +1,5 @@
 import { themeCookie } from "~/cookies"
-import { Route } from "./+types/theme[.]css"
+import type { Route } from "./+types/theme[.]css"
 
 function getTheme(color: string) {
     switch (color) {

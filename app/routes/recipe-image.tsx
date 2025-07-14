@@ -1,5 +1,5 @@
 import { fileStorage, getStorageKey } from "~/recipe-image-storage.server"
-import { Route } from "./+types/recipe-image"
+import type { Route } from "./+types/recipe-image"
 
 export async function loader({ params }: Route.LoaderArgs) {
     const storageKey = getStorageKey(params.recipeId)

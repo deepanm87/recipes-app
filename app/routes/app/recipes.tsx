@@ -1,4 +1,4 @@
-import { Route } from "./+types/recipes"
+import type { Route } from "./+types/recipes"
 import { requireLoggedInUser } from "~/utils/auth.server"
 import db from "~/db.server"
 import { useLoaderData, Outlet, Form, redirect, useLocation, NavLink, useNavigation, useFetcher, useFetchers, useSearchParams, Link } from "react-router"

@@ -3,7 +3,7 @@ import { DiscoverRecipeDetails, DiscoverRecipeHeader } from "~/components/discov
 import db from "~/db.server"
 import { getCurrentUser } from "~/utils/auth.server"
 import { hash } from "~/utils/cryptography.server"
-import { Route } from "./+types/discover.$recipeId"
+import type { Route } from "./+types/discover.$recipeId"
 
 export function headers({ loaderHeaders }: Route.HeaderArgs) {
     return {

@@ -1,27 +1,23 @@
 import { ErrorMessage, PrimaryButton, PrimaryInput } from "~/components/forms"
 import { z } from "zod"
-import { classNames } from "~/utils/misc"
 import { validateForm } from "~/utils/validation"
-import { useActionData } from "react-router"
-import { getUser } from "~/models/user.server"
-import { generateMagicLink } from "~/magic-links.server"
-import { sessionCookie } from "~/cookies"
+import { generateMagicLink, sendMagicLinkEmail } from "~/magic-links.server"
 import { getSession, commitSession } from "~/sessions"
-import { sendMagicLinkEmail } from "~/magic-links.server"
-import type { ActionFunction, LoaderFunction } from "react-router"
 import { v4 as uuid } from "uuid"
 import { requireLoggedOutUser } from "~/utils/auth.server"
+import type { Route } from "./+types/login"
+import { data, useActionData } from "react-router"
+
+export async function loader({ request }: Route.LoaderArgs) {
+    await requireLoggedOutUser(request)
+    return null
+}
 
 const loginSchema = z.object({
     email: z.string().email()
 })
 
-export const loader: LoaderFunction = async ({ request }) => {
-    await requireLoggedOutUser(request)
-    return null
-}
-
-export async function action: ActionFunction = async ({ request }) => {
+export async function action({ request }: Route.LoaderArgs)  {
     await requireLoggedOutUser(request)
     
     const cookieHeader = request.headers.get("cookie")
@@ -37,21 +33,24 @@ export async function action: ActionFunction = async ({ request }) => {
             const link = generateMagicLink(email, nonce)
             await sendMagicLinkEmail(link, email)
 
-            return { 
-                headers: {
-                    "Set-cookie": await commitSession(session)
+            return data(
+                { success: true },
+                { 
+                    headers: {
+                        "Set-cookie": await commitSession(session)
+                    }   
                 }
-            }
+            ) 
         },
-        errors => ({ errors, email: formData.get("email")?.toString() })
+        errors => data({ errors, email: formData.get("email")}, { status: 400 })
     )
 }
 
 export default function Login() {
-    const actionData = useActionData<typeof action>()
+    const actionData = useActionData<any>()
     return (
         <div className="text-center mt-36">
-            { actionData === "ok" ? 
+            { actionData?.success ? 
                 (
                     <div>
                         <h1 className="text-2xl py-8">Yum!</h1>

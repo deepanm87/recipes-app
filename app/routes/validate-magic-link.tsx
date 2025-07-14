@@ -6,7 +6,7 @@ import { createUser, getUser } from "~/models/user.server"
 import { commitSession, getSession } from "~/sessions"
 import { classNames } from "~/utils/misc"
 import { validateForm } from "~/utils/validation"
-import { Route } from "./+types/validate-magic-link"
+import type { Route } from "./+types/validate-magic-link"
 
 const magicLinkMaxAge = 1000 * 60 * 10
 
