@@ -1,6 +1,18 @@
 import { PrismaClient } from "@prisma/client"
 const db = new PrismaClient()
 
+class TimeStampGenerator {
+  seed: number
+  constructor() {
+    this.seed = Date.now()
+  }
+  next() {
+    return new Date(this.seed++)
+  }
+}
+
+const createdAt = new TimeStampGenerator()
+
 function createUser() {
     return db.user.create({
         data: {
@@ -126,8 +138,34 @@ async function deleteAll() {
 async function createAll() {
     const user = await createUser()
     await Promise.all([
-        ...getShelves(user.id).map( shelf => db.pantryShelf.create({ data: shelf })),
-        ...getRecipes(user.id).map(recipe => db.recipe.create({ data: recipe }))
+      ...getShelves(user.id).map( shelf => 
+        db.pantryShelf.create({
+          data: {
+            ...shelf,
+            createdAt: createdAt.next(),
+            items: {
+              create: shelf.items.create.map( item => ({
+                ...item,
+                createdAt: createdAt.next()
+              }))
+            }
+          }
+        })
+      ),
+      ...getRecipes(user.id).map(recipe => 
+        db.recipe.create({
+          data: {
+            ...recipe,
+            createdAt: createdAt.next(),
+            ingredients: {
+              create: recipe.ingredients.create.map( ingredient => ({
+                ...ingredient,
+                createdAt: createdAt.next()
+              }))
+            }
+          }
+        })
+      )
     ])
 }
 

@@ -12,3 +12,47 @@ export function headers({ loaderHeaders }: Route.HeaderArgs) {
     }
 }
 
+export async function loader({ params, request }: Route.LoaderArgs) {
+    const recipe = await db.recipe.findUnique({
+        where: { id: params.recipeId },
+        include: {
+            ingredients: {
+                select: {
+                    id: true,
+                    name: true,
+                    amount: true
+                }
+            }
+        }
+    })
+
+    if (recipe === null) {
+        throw data(
+            {
+                message: `A recipe with id ${params.id} does not exist.`
+            },
+            { status: 400 }
+        )
+    }
+
+    const user = await getCurrentUser(request)
+    const hashedUserId = hash(user?.id ?? "anonymous")
+    const hashedRecipe = hash(JSON.stringify(recipe))
+    const etag = `${hashedUserId}.${hashedRecipe}`
+
+    return data({ recipe }, { headers: { etag }})
+}
+
+export default function DiscoverRecipe() {
+    const data = useLoaderData<typeof loader>()
+
+    return (
+        <div className="md:h-[calc(100vh-1rem)] m-[-1rem] overflow-auto">
+            <DiscoverRecipeHeader recipe={data.recipe} />
+            <DiscoverRecipeDetails recipe={data.recipe} />
+        </div>
+    )
+    
+}
+
+
