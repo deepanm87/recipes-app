@@ -5,7 +5,7 @@ import { useLoaderData, Outlet, Form, redirect, useLocation, NavLink, useNavigat
 import { RecipeDetailWrapper, RecipeListWrapper, RecipePageWrapper, RecipeCard } from "~/components/recipes"
 import { SearchBar, PrimaryButton, DeleteButton } from "~/components/forms"
 import { CalendarIcon, PlusIcon } from "~/components/icons"
-import { useBuildSearchParams } from "~/utils/misc"
+import { classNames, useBuildSearchParams } from "~/utils/misc"
 
 export async function loader({ request }: Route.LoaderArgs) {
     const user = await requireLoggedInUser(request)
@@ -102,7 +102,7 @@ export default function Recipes() {
                 </div>
 
                 <Form method="post" className="mt-4" reloadDocument>
-                    { modelPlanOnlyFinterOn ? (
+                    { mealPlanOnlyFilterOn ? (
                         <DeleteButton
                             name="_action"
                             value="createRecipe"

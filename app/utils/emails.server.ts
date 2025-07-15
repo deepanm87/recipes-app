@@ -1,14 +1,14 @@
 import formData from "form-data"
 import Mailgun from "mailgun.js"
 
-if (typeof import.meta.env.MAILGUN_API_KEY !== "string") {
-    throw new Error("Missing env: MAILGUN_API_KEY")
+if (typeof import.meta.env.VITE_MAILGUN_API_KEY !== "string") {
+    throw new Error("Missing env: VITE_MAILGUN_API_KEY")
 }
 
 const mailgun = new Mailgun(formData)
 const client = mailgun.client({
     username: "api",
-    key: import.meta.env.MAILGUN_API_KEY
+    key: import.meta.env.VITE_MAILGUN_API_KEY
 })
 
 type Message = {
@@ -19,8 +19,8 @@ type Message = {
 }
 
 export function sendEmail(message: Message) {
-    if (typeof import.meta.env.MAILGUN_DOMAIN !== "string") {
-        throw new Error("Missing env: MAILGUN_DOMAIN")
+    if (typeof import.meta.env.VITE_MAILGUN_DOMAIN !== "string") {
+        throw new Error("Missing env: VITE_MAILGUN_DOMAIN")
     }
-    return client.messages.create(import.meta.env.MAILGUN_DOMAIN, message)
+    return client.messages.create(import.meta.env.VITE_MAILGUN_DOMAIN, message)
 }

@@ -1,44 +1,52 @@
-import { PrismaClient } from "@prisma/client"
-const db = new PrismaClient()
+import { PrismaClient } from "@prisma/client";
+const db = new PrismaClient();
 
-class TimeStampGenerator {
-  seed: number
+class TimestampGenerator {
+  seed: number;
   constructor() {
-    this.seed = Date.now()
+    this.seed = Date.now();
   }
   next() {
-    return new Date(this.seed++)
+    return new Date(this.seed++);
   }
 }
 
-const createdAt = new TimeStampGenerator()
+const createdAt = new TimestampGenerator();
 
 function createUser() {
-    return db.user.create({
-        data: {
-            email: "me@example.com",
-            firstName: "Deepan",
-            lastName: "Murugan"
-        }
-    })
+  return db.user.create({
+    data: {
+      email: "me@example.com",
+      firstName: "Zach",
+      lastName: "Taylor",
+    },
+  });
 }
 
 function getShelves(userId: string) {
-    return [
-        {
-            userId,
-            name: "Dairy",
-            items: {
-                create: [{userId, name: "Milk"}, { name: "Eggs" }, { name: "Cheese" }]
-            }
-        }, {
-            userId,
-            name: "Fruits",
-            items: {
-                create: [{ userId, name: "Apples" }, { name: "Bananas"}]
-            }
-        }
-    ]
+  return [
+    {
+      userId,
+      name: "Dairy",
+      items: {
+        create: [
+          { userId, name: "Milk" },
+          { userId, name: "Eggs" },
+          { userId, name: "Cheese" },
+        ],
+      },
+    },
+    {
+      userId,
+      name: "Fruits",
+      items: {
+        create: [
+          { userId, name: "Apples" },
+          { userId, name: "Oranges" },
+        ],
+      },
+    },
+  ];
 }
 
 function getRecipes(userId: string) {
@@ -130,50 +138,48 @@ function getRecipes(userId: string) {
 }
 
 async function deleteAll() {
-    await db.recipe.deleteMany()
-    await db.pantryShelf.deleteMany()
-    await db.user.deleteMany()
+  await db.recipe.deleteMany();
+  await db.pantryShelf.deleteMany();
+  await db.user.deleteMany();
 }
 
 async function createAll() {
-    const user = await createUser()
-    await Promise.all([
-      ...getShelves(user.id).map( shelf => 
-        db.pantryShelf.create({
-          data: {
-            ...shelf,
-            createdAt: createdAt.next(),
-            items: {
-              create: shelf.items.create.map( item => ({
-                ...item,
-                createdAt: createdAt.next()
-              }))
-            }
-          }
-        })
-      ),
-      ...getRecipes(user.id).map(recipe => 
-        db.recipe.create({
-          data: {
-            ...recipe,
-            createdAt: createdAt.next(),
-            ingredients: {
-              create: recipe.ingredients.create.map( ingredient => ({
-                ...ingredient,
-                createdAt: createdAt.next()
-              }))
-            }
-          }
-        })
-      )
-    ])
+  const user = await createUser();
+  await Promise.all([
+    ...getShelves(user.id).map((shelf) =>
+      db.pantryShelf.create({
+        data: {
+          ...shelf,
+          createdAt: createdAt.next(),
+          items: {
+            create: shelf.items.create.map((item) => ({
+              ...item,
+              createdAt: createdAt.next(),
+            })),
+          },
+        },
+      })
+    ),
+    ...getRecipes(user.id).map((recipe) =>
+      db.recipe.create({
+        data: {
+          ...recipe,
+          createdAt: createdAt.next(),
+          ingredients: {
+            create: recipe.ingredients.create.map((ingredient) => ({
+              ...ingredient,
+              createdAt: createdAt.next(),
+            })),
+          },
+        },
+      })
+    ),
+  ]);
 }
 
 async function seed() {
-    await deleteAll()
-    await createAll()
+  await deleteAll();
+  await createAll();
 }
 
-seed()
-
-
+seed();

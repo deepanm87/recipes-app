@@ -1,15 +1,27 @@
-import type { Route } from "./+types/discover"
-import styles from "~/styles/index.css?url"
+import { useLoaderData } from "react-router"
+import { DiscoverGrid, DiscoverListItem } from "~/components/discover"
+import db from "~/db.server"
 
-export const links: Route.LinksFunction = () => {
-    return [{ rel: "stylesheet", href: styles }]
+export async function loader() {
+    const recipes = await db.recipe.findMany({
+        take: 25,
+        orderBy: { updatedAt: "desc" },
+        include: { user: { select: { firstName: true, lastName: true }}}
+    })
+
+    return { recipes }
 }
 
 export default function Discover() {
+    const data = useLoaderData<typeof loader>()
     return (
-        <div>
-            <h1>Discover</h1>
-            <p>This is the discover page</p>
+        <div className="h-[calc(100vh-1rem)] p-4 m-[1-rem] overflow-auto">
+            <h1 className="text-2xl font-bold mb-4">Discover</h1>
+            <DiscoverGrid>
+                {data.recipes.map( recipe => (
+                    <DiscoverListItem key={recipe.id} recipe={recipe} />
+                ))}
+            </DiscoverGrid>
         </div>
     )
 }

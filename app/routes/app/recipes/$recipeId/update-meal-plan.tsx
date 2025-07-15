@@ -8,7 +8,7 @@ import { canChangeRecipe } from "~/utils/abilities.server"
 import { classNames } from "~/utils/misc"
 import { validateForm } from "~/utils/validation"
 import { useRecipeContext } from "../$recipeId"
-import { Route } from "./+types/update-meal-plan"
+import type { Route } from "./+types/update-meal-plan"
 
 const updateMealPlanSchema = z.object({
     mealPlanMultiplier: z.preprocess(
@@ -34,14 +34,14 @@ export async function action({ request, params }: Route.ActionArgs) {
                         data: { mealPlanMultiplier }
                     })
                     return redirect("..")
-                }
+                },
                 errors => data( { errors }, { status: 400 })
             )
         }
         case "removeFromMealPlan": {
             await db.recipe.update({
                 where: { id: recipeId },
-                data: { mealPlanMultiplier }
+                data: { mealPlanMultiplier: null }
             })
             return redirect("..")
         }

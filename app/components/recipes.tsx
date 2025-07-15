@@ -1,5 +1,5 @@
 import React from "react";
-import classNames from "classnames";
+import { classNames } from "~/utils/misc";
 import { TimeIcon } from "~/components/icons";
 import { useParams } from "react-router";
 
@@ -73,11 +73,8 @@ export function RecipeCard({
       className={classNames(
         "group flex shadow-md rounded-md border-2",
         "hover:text-primary hover:border-primary",
-        {
-          "border-white": !isActive && !isLoading,
-          "border-primary text-primary": isActive,
-          "border-gray-500 text-gray-500": isLoading
-        }
+        isActive ? "border-primary text-primary": "border-white",
+        isLoading ? "border-gray-500 text-gray-500" : ""
       )}
     >
       <div className="w-14 h-14 rounded-full overflow-hidden my-4 ml-3">
@@ -96,10 +93,8 @@ export function RecipeCard({
           className={classNames(
             "flex font-light",
             "group-hover:text-primary-light",
-            {
-              "text-gray-500": !isActive || isLoading,
-              "text-primary-light": isActive
-            }
+            isActive ? "text-primary-light": "text-gray-500",
+            isLoading ? "text-gray-500" : ""
           )}
         >
           <TimeIcon />
