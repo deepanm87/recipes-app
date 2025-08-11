@@ -37,7 +37,7 @@ import {
 } from "~/utils/misc";
 import { validateForm } from "~/utils/validation";
 import { fileStorage, getStorageKey } from "~/recipe-image-storage.server";
-import { Route } from "./+types/$recipeId";
+import type{ Route } from "./+types/$recipeId";
 
 export function headers() {
   return {

@@ -3,7 +3,7 @@ import { z } from "zod"
 import { PrimaryButton } from "~/components/forms"
 import { themeCookie } from "~/cookies"
 import { validateForm } from "~/utils/validation"
-import { Route } from "./+types/app"
+import type { Route } from "./+types/app"
 
 export async function loader({ request }: Route.LoaderArgs) {
     const cookieHeader = request.headers.get("cookie")

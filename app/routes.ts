@@ -45,4 +45,4 @@ export default [
   route("validate-magic-link", "routes/validate-magic-link.tsx"),
 
   ...testRoutes(),
-] as RouteConfig;
+] satisfies RouteConfig;
