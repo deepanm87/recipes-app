@@ -1,7 +1,7 @@
+import { useParams } from "react-router";
 import React from "react";
 import { classNames } from "~/utils/misc";
-import { TimeIcon } from "~/components/icons";
-import { useParams } from "react-router";
+import { TimeIcon } from "./icons";
 
 type RecipePageWrapperProps = {
   children: React.ReactNode;
@@ -73,7 +73,7 @@ export function RecipeCard({
       className={classNames(
         "group flex shadow-md rounded-md border-2",
         "hover:text-primary hover:border-primary",
-        isActive ? "border-primary text-primary": "border-white",
+        isActive ? "border-primary text-primary" : "border-white",
         isLoading ? "border-gray-500 text-gray-500" : ""
       )}
     >
@@ -93,7 +93,7 @@ export function RecipeCard({
           className={classNames(
             "flex font-light",
             "group-hover:text-primary-light",
-            isActive ? "text-primary-light": "text-gray-500",
+            isActive ? "text-primary-light" : "text-gray-500",
             isLoading ? "text-gray-500" : ""
           )}
         >

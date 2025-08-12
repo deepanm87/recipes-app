@@ -1,5 +1,5 @@
 {
-  "name": "recipes",
+  "name": "remix-recipes",
   "private": true,
   "sideEffects": false,
   "type": "module",
@@ -15,7 +15,7 @@
   "dependencies": {
     "@mjackson/file-storage": "^0.3.0",
     "@mjackson/form-data-parser": "^0.5.1",
-    "@prisma/client": "^6.0.0",
+    "@prisma/client": "^6.13.0",
     "@react-router/node": "^7.0.0",
     "@react-router/serve": "^7.0.0",
     "cross-env": "^7.0.3",

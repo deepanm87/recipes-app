@@ -1,6 +1,5 @@
-import { redirect } from "react-router"
+import { redirect } from "react-router";
 
 export function loader() {
-    return redirect("/settings/app")
+  return redirect("/settings/app");
 }
-

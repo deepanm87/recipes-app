@@ -1,63 +1,65 @@
-import { useEffect, useLayoutEffect, useState, useRef, useMemo } from "react"
-import { useLocation, useMatches } from "react-router"
+import React, { useEffect, useLayoutEffect } from "react";
+import { useLocation, useMatches } from "react-router";
 
 export function classNames(...names: Array<string | undefined>) {
-    const className = names.reduce(
-        (acc, name) => (name ? `${acc} ${name}` : acc),
-        ""
-    )
+  const className = names.reduce(
+    (acc, name) => (name ? `${acc} ${name}` : acc),
+    ""
+  );
 
-    return className || ""
+  return className || "";
 }
 
 export function useMatchesData(id: string) {
-    const matches = useMatches()
-    const route = useMemo(
-        () => matches.find(route => route.id === id),
-        [matches, id]
-    )
-    return route?.data
+  const matches = useMatches();
+  const route = React.useMemo(
+    () => matches.find((route) => route.id === id),
+    [matches, id]
+  );
+  return route?.data;
 }
 
-let hasHydrated = false
+let hasHydrated = false;
 export function useIsHydrated() {
-    const [isHydrated, setIsHydrated] = useState(hasHydrated)
+  const [isHydrated, setIsHydrated] = React.useState(hasHydrated);
 
-    useEffect(() => {
-        hasHydrated = true
-        setIsHydrated(true)
-    }, [])
+  React.useEffect(() => {
+    hasHydrated = true;
+    setIsHydrated(true);
+  }, []);
 
-    return isHydrated
+  return isHydrated;
 }
 
 export function isRunningOnServer() {
-    return typeof window === "undefined"
+  return typeof window === "undefined";
 }
 
-export const useServerLayoutEffect = isRunningOnServer() ? useEffect : useLayoutEffect
+export const useServerLayoutEffect = isRunningOnServer()
+  ? useEffect
+  : useLayoutEffect;
 
 export function useDebouncedFunction<T extends Array<any>>(
-    fn: (...args: T) => unknown,
-    time: number
+  fn: (...args: T) => unknown,
+  time: number
 ) {
-    const timeoutId = useRef<number>()
+  const timeoutId = React.useRef<number>();
 
-    const debouncedFn = (...args: T) => {
-        window.clearTimeout(timeoutId.current)
-        timeoutId.current = window.setTimeout(() => fn(...args), time)
-    }
+  const debouncedFn = (...args: T) => {
+    window.clearTimeout(timeoutId.current);
+    timeoutId.current = window.setTimeout(() => fn(...args), time);
+  };
 
-    return debouncedFn
+  return debouncedFn;
 }
 
 export function useBuildSearchParams() {
-    const location = useLocation()
+  const location = useLocation();
 
-    return (name: string, value: string) => {
-        const searchParams = new URLSearchParams(location.search)
-        searchParams.set(name, value)
+  return (name: string, value: string) => {
+    const searchParams = new URLSearchParams(location.search);
+    searchParams.set(name, value);
 
-        return `?${searchParams.toString()}`
-    }
+    return `?${searchParams.toString()}`;
+  };
 }

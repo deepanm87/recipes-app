@@ -1,12 +1,13 @@
-import { createCookie } from "react-router"
+import { createCookie } from "react-router";
 
-if (typeof import.meta.env.AUTH_COOKIE_SECRET !== "string") {
-    throw new Error("Missing env: AUTH_COOKIE_SECRET")
+if (typeof process.env.AUTH_COOKIE_SECRET !== "string") {
+  throw new Error("Missing env: AUTH_COOKIE_SECRET");
 }
-export const sessionCookie = createCookie("recipes__session", {
-    secrets: [import.meta.env.AUTH_COOKIE_SECRET],
-    httpOnly: true,
-    secure: true
-})
 
-export const themeCookie = createCookie("recipes__theme")
+export const sessionCookie = createCookie("remix-recipes__session", {
+  secrets: [process.env.AUTH_COOKIE_SECRET],
+  httpOnly: true,
+  secure: true,
+});
+
+export const themeCookie = createCookie("remix-recipes__theme");

@@ -1,15 +1,15 @@
-import { PrismaClient } from "@prisma/client"
+import { PrismaClient } from "@prisma/client";
 
-type NodeJSGlobal = typeof globalThis
+type NodeJSGlobal = typeof globalThis;
 
 interface CustomNodeJSGlobal extends NodeJSGlobal {
-    db: PrismaClient
+  db: PrismaClient;
 }
 
-declare const global: CustomNodeJSGlobal
+declare const global: CustomNodeJSGlobal;
 
-const db = global.db || new PrismaClient()
+const db = global.db || new PrismaClient();
 
-if (import.meta.env.NODE_ENV === "development") global.db = db
+if (process.env.NODE_ENV === "development") global.db = db;
 
-export default db
+export default db;

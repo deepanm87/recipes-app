@@ -1,7 +1,7 @@
-import { LocalFileStorage } from "@mjackson/file-storage/local"
+import { LocalFileStorage } from "@mjackson/file-storage/local";
 
-export const fileStorage = new LocalFileStorage("public/images")
+export const fileStorage = new LocalFileStorage("public/images");
 
 export function getStorageKey(recipeId: string) {
-    return `recipe-${recipeId}-image`
+  return `recipe-${recipeId}-image`;
 }
